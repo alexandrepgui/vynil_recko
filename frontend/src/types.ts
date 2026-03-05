@@ -1,3 +1,5 @@
+export type MediaType = 'vinyl' | 'cd';
+
 export interface LabelData {
   albums: string[];
   artists: string[];

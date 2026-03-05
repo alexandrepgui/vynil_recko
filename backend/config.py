@@ -26,7 +26,7 @@ SINGLE_SEARCH_BATCH_ID = "single-search"
 
 # ── LLM Prompts ──────────────────────────────────────────────────────────────
 
-LABEL_READING_PROMPT = (
+VINYL_LABEL_READING_PROMPT = (
     "Look at this vinyl record label image. "
     "Extract as much information as possible. "
     "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
@@ -44,7 +44,28 @@ LABEL_READING_PROMPT = (
     "Nothing else."
 )
 
-RANKING_PROMPT = (
+CD_LABEL_READING_PROMPT = (
+    "Look at this CD image (disc, jewel case, or booklet). "
+    "Extract as much information as possible. "
+    "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
+    "For albums: include the full title, shorter versions without subtitles, and any plausible variations. "
+    "For artists: include variations (e.g. with/without featured artists). "
+    "Also extract any optional metadata visible on the disc or case. "
+    "Output ONLY a JSON object with these keys:\n"
+    '- "albums": array of strings (required)\n'
+    '- "artists": array of strings (required)\n'
+    '- "country": string or null (if visible)\n'
+    '- "format": string or null (e.g. "CD", "CD, Album", "CD, Single")\n'
+    '- "label": string or null (record label name)\n'
+    '- "catno": string or null (catalog number)\n'
+    '- "barcode": string or null (barcode if visible)\n'
+    '- "year": string or null (release year if visible)\n'
+    "Nothing else."
+)
+
+LABEL_READING_PROMPTS = {"vinyl": VINYL_LABEL_READING_PROMPT, "cd": CD_LABEL_READING_PROMPT}
+
+VINYL_RANKING_PROMPT = (
     "I searched Discogs and found these candidate releases. "
     "Based on the vinyl label you just analyzed, rank them by how likely each one is the exact record shown in the image. "
     "Output ONLY a JSON object with two keys:\n"
@@ -53,3 +74,15 @@ RANKING_PROMPT = (
     "(e.g. completely wrong artist, wrong album, clearly a different release). "
     "Only discard records you are certain about."
 )
+
+CD_RANKING_PROMPT = (
+    "I searched Discogs and found these candidate releases. "
+    "Based on the CD you just analyzed, rank them by how likely each one is the exact release shown in the image. "
+    "Output ONLY a JSON object with two keys:\n"
+    '- "likeliness": array of index values ordered from most likely to least likely\n'
+    '- "discarded": array of index values for records that are FOR SURE not the correct record '
+    "(e.g. completely wrong artist, wrong album, clearly a different release). "
+    "Only discard records you are certain about."
+)
+
+RANKING_PROMPTS = {"vinyl": VINYL_RANKING_PROMPT, "cd": CD_RANKING_PROMPT}

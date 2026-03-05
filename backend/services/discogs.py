@@ -61,17 +61,22 @@ def prefilter(releases: list[dict], candidate_artists: list[str]) -> list[dict]:
     return filtered if filtered else releases
 
 
+_MEDIA_TYPE_TO_FORMAT = {"vinyl": "Vinyl", "cd": "CD"}
+
+
 def search_with_strategy(
     candidate_albums: list[str],
     candidate_artists: list[str],
     label_meta: dict,
+    media_type: str = "vinyl",
 ) -> tuple[list[dict], str, list[str]]:
     """Try progressively looser search strategies. Returns (releases, strategy_used, strategies_tried)."""
     tried: list[str] = []
+    fmt = {"format": _MEDIA_TYPE_TO_FORMAT[media_type]}
 
     # 1. Catalog number + label (most precise)
     if label_meta.get("catno"):
-        params = {"catno": label_meta["catno"]}
+        params = {"catno": label_meta["catno"], **fmt}
         if label_meta.get("label"):
             params["label"] = label_meta["label"]
         strategy = f"catno='{label_meta['catno']}'" + (
@@ -88,7 +93,7 @@ def search_with_strategy(
             strategy_1b = f"catno='{label_meta['catno']}'"
             tried.append(strategy_1b)
             log.info("Strategy 1b: catno only (dropping label)")
-            results = discogs_search(catno=label_meta["catno"])
+            results = discogs_search(catno=label_meta["catno"], **fmt)
             if results:
                 log.info("Strategy 1b hit: %d results", len(results))
                 return results, strategy_1b, tried
@@ -100,7 +105,7 @@ def search_with_strategy(
             strategy = f"q='{query}'"
             tried.append(strategy)
             log.info("Strategy 2: freeform q='%s'", query)
-            results = discogs_search(q=query)
+            results = discogs_search(q=query, **fmt)
             if results:
                 log.info("Strategy 2 hit: %d results", len(results))
                 return results, strategy, tried
@@ -111,7 +116,7 @@ def search_with_strategy(
             strategy = f"release_title='{album}' + artist='{artist}'"
             tried.append(strategy)
             log.info("Strategy 3: release_title='%s' artist='%s'", album, artist)
-            results = discogs_search(artist=artist, release_title=album)
+            results = discogs_search(artist=artist, release_title=album, **fmt)
             if results:
                 log.info("Strategy 3 hit: %d results", len(results))
                 return results, strategy, tried
@@ -119,7 +124,7 @@ def search_with_strategy(
     # 4. Artist-only search, fuzzy match titles
     for artist in candidate_artists:
         log.info("Strategy 4: artist-only '%s'", artist)
-        artist_results = discogs_search(artist=artist)
+        artist_results = discogs_search(artist=artist, **fmt)
         if not artist_results:
             tried.append(f"artist='{artist}' (no results)")
             continue

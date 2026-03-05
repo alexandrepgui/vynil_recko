@@ -1,12 +1,12 @@
 import time
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 
 from config import SINGLE_SEARCH_BATCH_ID
 from deps import get_repo
 from logger import get_logger
-from models import AddToCollectionRequest, SearchResponse
+from models import AddToCollectionRequest, MediaType, SearchResponse
 from repository import BatchItem, CollectionRecord, SearchRecord
 from repository.mongo import MongoRepository
 from services.discogs import add_to_collection
@@ -29,7 +29,11 @@ def _save_record(repo: MongoRepository, record: SearchRecord, start_time: float)
 
 
 @router.post("/api/search", response_model=SearchResponse)
-async def search(file: UploadFile, repo: MongoRepository = Depends(get_repo)):
+async def search(
+    file: UploadFile,
+    media_type: MediaType = Form(MediaType.VINYL),
+    repo: MongoRepository = Depends(get_repo),
+):
     request_start = time.time()
     record = SearchRecord(image_filename=file.filename)
 
@@ -52,7 +56,7 @@ async def search(file: UploadFile, repo: MongoRepository = Depends(get_repo)):
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
 
     try:
-        response = process_single_image(image_bytes, file.content_type)
+        response = process_single_image(image_bytes, file.content_type, media_type=media_type)
     except ValueError as e:
         record.status = "error_vision"
         log.error("Search pipeline failed (validation): %s", e)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './App.css';
 import { searchByImage } from './api';
-import type { SearchResponse } from './types';
+import type { MediaType, SearchResponse } from './types';
 import ImageUpload from './components/ImageUpload';
 import ResultsList from './components/ResultsList';
 import BatchView from './components/BatchView';
@@ -11,6 +11,7 @@ type Mode = 'single' | 'batch' | 'review';
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('single');
+  const [mediaType, setMediaType] = useState<MediaType>('vinyl');
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function App() {
     setResponse(null);
 
     try {
-      const data = await searchByImage(file);
+      const data = await searchByImage(file, mediaType);
       setResponse(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -34,7 +35,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1>Vinyl Recko</h1>
-        <p>Drop a record label photo to identify your vinyl</p>
+        <p>Drop a {mediaType === 'cd' ? 'CD' : 'record label'} photo to identify your {mediaType === 'cd' ? 'CD' : 'vinyl'}</p>
       </header>
 
       <div className="mode-tabs">
@@ -58,9 +59,26 @@ export default function App() {
         </button>
       </div>
 
+      {mode !== 'review' && (
+        <div className="media-type-toggle">
+          <button
+            className={`media-type-btn ${mediaType === 'vinyl' ? 'active' : ''}`}
+            onClick={() => setMediaType('vinyl')}
+          >
+            Vinyl
+          </button>
+          <button
+            className={`media-type-btn ${mediaType === 'cd' ? 'active' : ''}`}
+            onClick={() => setMediaType('cd')}
+          >
+            CD
+          </button>
+        </div>
+      )}
+
       {mode === 'single' && (
         <>
-          <ImageUpload onFileSelected={handleFileSelected} isLoading={isLoading} />
+          <ImageUpload onFileSelected={handleFileSelected} isLoading={isLoading} mediaType={mediaType} />
 
           {isLoading && (
             <div className="loading">
@@ -83,7 +101,7 @@ export default function App() {
         </>
       )}
 
-      {mode === 'batch' && <BatchView onGoToReview={() => setMode('review')} />}
+      {mode === 'batch' && <BatchView onGoToReview={() => setMode('review')} mediaType={mediaType} />}
 
       {mode === 'review' && <ReviewView />}
     </div>

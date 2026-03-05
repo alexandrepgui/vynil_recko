@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
+import type { MediaType } from '../types';
 
 interface Props {
   onFileSelected: (file: File) => void;
   isLoading: boolean;
+  mediaType?: MediaType;
 }
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png'];
 
-export default function ImageUpload({ onFileSelected, isLoading }: Props) {
+export default function ImageUpload({ onFileSelected, isLoading, mediaType = 'vinyl' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -79,7 +81,7 @@ export default function ImageUpload({ onFileSelected, isLoading }: Props) {
         <img src={preview} alt="Label preview" className="upload-preview" />
       ) : (
         <div className="upload-placeholder">
-          <p>Drop or paste a vinyl label image here</p>
+          <p>Drop or paste a {mediaType === 'cd' ? 'CD' : 'vinyl label'} image here</p>
           <p className="upload-hint">or click to browse (JPEG / PNG)</p>
         </div>
       )}

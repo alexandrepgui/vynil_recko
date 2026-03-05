@@ -8,10 +8,10 @@ import requests
 from config import (
     CACHE_DIR,
     CACHE_MAX_ENTRIES,
-    LABEL_READING_PROMPT,
+    LABEL_READING_PROMPTS,
     MAX_RANKING_RESULTS,
     OPENROUTER_URL,
-    RANKING_PROMPT,
+    RANKING_PROMPTS,
     VISION_MODEL,
 )
 from logger import get_logger
@@ -21,14 +21,14 @@ log = get_logger("services.vision")
 
 # ── Disk cache (LRU by mtime, keyed on image SHA-256) ───────────────────────
 
-def _cache_path(image_bytes: bytes) -> "Path":
+def _cache_path(image_bytes: bytes, media_type: str = "vinyl") -> "Path":
     from pathlib import Path
-    key = hashlib.sha256(image_bytes).hexdigest()
+    key = hashlib.sha256(image_bytes + media_type.encode()).hexdigest()
     return Path(CACHE_DIR) / f"{key}.json"
 
 
-def _read_cache(image_bytes: bytes) -> dict | None:
-    path = _cache_path(image_bytes)
+def _read_cache(image_bytes: bytes, media_type: str = "vinyl") -> dict | None:
+    path = _cache_path(image_bytes, media_type)
     if not path.exists():
         return None
     try:
@@ -41,11 +41,11 @@ def _read_cache(image_bytes: bytes) -> dict | None:
         return None
 
 
-def _write_cache(image_bytes: bytes, label_data: dict) -> None:
+def _write_cache(image_bytes: bytes, label_data: dict, media_type: str = "vinyl") -> None:
     from pathlib import Path
     Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
     _evict_if_needed()
-    path = _cache_path(image_bytes)
+    path = _cache_path(image_bytes, media_type)
     path.write_text(json.dumps(label_data))
     log.info("Cache WRITE: %s", path.name)
 
@@ -94,17 +94,17 @@ def _parse_json(raw: str) -> dict | list:
         raise
 
 
-def read_label_image(image_bytes: bytes, mime_type: str) -> tuple[dict, list[dict], bool]:
+def read_label_image(image_bytes: bytes, mime_type: str, media_type: str = "vinyl") -> tuple[dict, list[dict], bool]:
     """Extract label metadata via vision. Returns (label_data, conversation_messages, cache_hit).
 
-    Results are cached on disk keyed by image SHA-256. On cache hit the LLM call
-    is skipped entirely and a synthetic conversation is reconstructed so that
-    downstream rank_results() still works.
+    Results are cached on disk keyed by image SHA-256 + media_type. On cache hit
+    the LLM call is skipped entirely and a synthetic conversation is reconstructed
+    so that downstream rank_results() still works.
     """
-    log.info("Reading label image: size=%d bytes, mime=%s", len(image_bytes), mime_type)
+    log.info("Reading label image: size=%d bytes, mime=%s, media_type=%s", len(image_bytes), mime_type, media_type)
 
     # Check cache first
-    cached = _read_cache(image_bytes)
+    cached = _read_cache(image_bytes, media_type)
     if cached is not None:
         # Rebuild a minimal conversation so rank_results can append to it
         b64_image = base64.b64encode(image_bytes).decode()
@@ -130,7 +130,7 @@ def read_label_image(image_bytes: bytes, mime_type: str) -> tuple[dict, list[dic
                     "type": "image_url",
                     "image_url": {"url": f"data:{mime_type};base64,{b64_image}"},
                 },
-                {"type": "text", "text": LABEL_READING_PROMPT},
+                {"type": "text", "text": LABEL_READING_PROMPTS[media_type]},
             ],
         }
     ]
@@ -142,7 +142,7 @@ def read_label_image(image_bytes: bytes, mime_type: str) -> tuple[dict, list[dic
         label_data.get("albums"), label_data.get("artists"),
     )
 
-    _write_cache(image_bytes, label_data)
+    _write_cache(image_bytes, label_data, media_type)
 
     return label_data, messages, False
 
@@ -150,6 +150,7 @@ def read_label_image(image_bytes: bytes, mime_type: str) -> tuple[dict, list[dic
 def rank_results(
     releases: list[dict],
     conversation: list[dict],
+    media_type: str = "vinyl",
 ) -> tuple[list[int], list[int]]:
     """Ask the LLM to rank Discogs results using the same conversation context.
 
@@ -171,7 +172,7 @@ def rank_results(
 
     conversation.append({
         "role": "user",
-        "content": f"{RANKING_PROMPT}\n\n{json.dumps(candidates, indent=2)}",
+        "content": f"{RANKING_PROMPTS[media_type]}\n\n{json.dumps(candidates, indent=2)}",
     })
 
     raw, _ = _chat(conversation)

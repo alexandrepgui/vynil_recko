@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { uploadBatch } from '../api';
+import type { MediaType } from '../types';
 
 interface Props {
   onBatchCreated: (batchId: string, totalImages: number) => void;
+  mediaType?: MediaType;
 }
 
-export default function BatchUpload({ onBatchCreated }: Props) {
+export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -21,7 +23,7 @@ export default function BatchUpload({ onBatchCreated }: Props) {
       setIsUploading(true);
 
       try {
-        const { batch_id, total_images } = await uploadBatch(file);
+        const { batch_id, total_images } = await uploadBatch(file, mediaType);
         onBatchCreated(batch_id, total_images);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Upload failed.');
@@ -66,7 +68,7 @@ export default function BatchUpload({ onBatchCreated }: Props) {
           <p>Uploading...</p>
         ) : (
           <>
-            <p>Drop a .zip of vinyl label images here</p>
+            <p>Drop a .zip of {mediaType === 'cd' ? 'CD' : 'vinyl label'} images here</p>
             <p className="upload-hint">or click to browse</p>
           </>
         )}

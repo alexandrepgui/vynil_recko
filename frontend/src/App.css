@@ -248,6 +248,40 @@
   border-bottom-color: #4a90d9;
 }
 
+/* Media type toggle */
+.media-type-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 1.5rem;
+}
+
+.media-type-btn {
+  padding: 0.4rem 1.2rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+  transition: background 0.15s, color 0.15s;
+}
+
+.media-type-btn:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.media-type-btn:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.media-type-btn.active {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: #fff;
+}
+
 /* Batch upload error */
 .batch-upload-error {
   color: #c0392b;

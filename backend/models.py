@@ -3,6 +3,11 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 
+class MediaType(StrEnum):
+    VINYL = "vinyl"
+    CD = "cd"
+
+
 class SearchStatus(StrEnum):
     PENDING = "pending"
     SUCCESS = "success"
