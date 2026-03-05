@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAuthStatus, logout, startOAuthLogin } from '../api';
 import type { AuthStatus } from '../types';
 
@@ -6,13 +6,16 @@ export default function DiscogsAuth() {
   const [status, setStatus] = useState<AuthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
       const s = await getAuthStatus();
       setStatus(s);
+      return s;
     } catch {
       // Auth endpoint unavailable — likely no OAuth configured
+      return null;
     }
   }, []);
 
@@ -20,17 +23,12 @@ export default function DiscogsAuth() {
     fetchStatus();
   }, [fetchStatus]);
 
-  // Listen for the popup closing message after OAuth completes
+  // Clean up polling on unmount
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      if (e.data?.type === 'discogs-oauth-complete') {
-        fetchStatus();
-      }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
     };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [fetchStatus]);
+  }, []);
 
   if (!status || !status.oauth_configured) return null;
 
@@ -39,11 +37,20 @@ export default function DiscogsAuth() {
     setError(null);
     try {
       const authorizeUrl = await startOAuthLogin();
-      // Open Discogs authorization in a popup
-      window.open(authorizeUrl, 'discogs-oauth', 'width=600,height=700');
+      const popup = window.open(authorizeUrl, 'discogs-oauth', 'width=600,height=700');
+
+      // Poll auth status until authenticated or popup closes
+      pollRef.current = setInterval(async () => {
+        const closed = !popup || popup.closed;
+        const s = await fetchStatus();
+        if (s?.authenticated || closed) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setLoading(false);
+        }
+      }, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start login');
-    } finally {
       setLoading(false);
     }
   };

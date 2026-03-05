@@ -59,7 +59,6 @@ async def login(request: Request):
 
 @router.get("/callback", name="oauth_callback")
 async def oauth_callback(
-    request: Request,
     oauth_token: str = Query(...),
     oauth_verifier: str = Query(...),
 ):
@@ -88,22 +87,12 @@ async def oauth_callback(
 
     log.info("OAuth completed for user: %s", tokens.username)
 
-    # Use the request's origin for postMessage (see DiscogsAuth.tsx origin check)
-    origin = f"{request.url.scheme}://{request.url.hostname}"
-    if request.url.port:
-        origin += f":{request.url.port}"
-
     return HTMLResponse(
-        content=f"""<!DOCTYPE html>
+        content="""<!DOCTYPE html>
 <html><head><title>Vinyl Recko — Connected</title></head>
 <body>
-<p>Connected to Discogs! You can close this window.</p>
-<script>
-  if (window.opener) {{
-    window.opener.postMessage({{ type: "discogs-oauth-complete" }}, "{origin}");
-  }}
-  window.close();
-</script>
+<p>Connected to Discogs! This window will close automatically.</p>
+<script>window.close();</script>
 </body></html>"""
     )
 
