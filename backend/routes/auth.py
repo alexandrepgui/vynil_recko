@@ -7,6 +7,8 @@ Provides endpoints for:
   POST /api/auth/logout   — clear stored OAuth tokens
 """
 
+import os
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
@@ -44,8 +46,9 @@ async def login(request: Request):
             detail="Discogs OAuth not configured. Set DISCOGS_CONSUMER_KEY and DISCOGS_CONSUMER_SECRET in .env",
         )
 
-    # Build callback URL pointing back to our /api/auth/callback endpoint
-    callback_url = str(request.url_for("oauth_callback"))
+    # In Docker, request.url_for() uses the container hostname (e.g. "backend")
+    # which the browser can't resolve. Allow overriding via OAUTH_CALLBACK_URL.
+    callback_url = os.getenv("OAUTH_CALLBACK_URL") or str(request.url_for("oauth_callback"))
     log.info("Starting OAuth flow with callback: %s", callback_url)
 
     try:
