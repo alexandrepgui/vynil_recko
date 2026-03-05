@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getBatch } from '../api';
-import type { Batch } from '../types';
+import type { Batch, MediaType } from '../types';
 import BatchUpload from './BatchUpload';
 import BatchProgress from './BatchProgress';
 
@@ -8,9 +8,10 @@ type Phase = 'upload' | 'processing' | 'done';
 
 interface Props {
   onGoToReview?: () => void;
+  mediaType?: MediaType;
 }
 
-export default function BatchView({ onGoToReview }: Props) {
+export default function BatchView({ onGoToReview, mediaType = 'vinyl' }: Props) {
   const [phase, setPhase] = useState<Phase>('upload');
   const [batchId, setBatchId] = useState<string | null>(null);
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -57,7 +58,7 @@ export default function BatchView({ onGoToReview }: Props) {
       {error && <p className="error">{error}</p>}
 
       {phase === 'upload' && (
-        <BatchUpload onBatchCreated={handleBatchCreated} />
+        <BatchUpload onBatchCreated={handleBatchCreated} mediaType={mediaType} />
       )}
 
       {phase === 'processing' && batch && (

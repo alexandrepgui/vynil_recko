@@ -6,5 +6,34 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+
 volumes:
   mongo_data:

@@ -8,13 +8,13 @@ from logger import get_logger
 log = get_logger("services.search")
 
 
-def process_single_image(image_bytes: bytes, content_type: str) -> SearchResponse:
+def process_single_image(image_bytes: bytes, content_type: str, media_type: str = "vinyl") -> SearchResponse:
     """Run the full search pipeline for a single image.
 
     Raises on failure (callers handle errors).
     """
     # 1. Vision — extract label data
-    label_data, conversation, cache_hit = read_label_image(image_bytes, content_type)
+    label_data, conversation, cache_hit = read_label_image(image_bytes, content_type, media_type)
 
     candidate_albums = label_data.get("albums", [])
     candidate_artists = label_data.get("artists", [])
@@ -34,7 +34,7 @@ def process_single_image(image_bytes: bytes, content_type: str) -> SearchRespons
 
     # 2. Discogs search
     releases, strategy, strategies_tried = search_with_strategy(
-        candidate_albums, candidate_artists, label_meta,
+        candidate_albums, candidate_artists, label_meta, media_type=media_type,
     )
 
     log.info("Discogs search: strategy='%s' results=%d", strategy, len(releases))
@@ -53,7 +53,7 @@ def process_single_image(image_bytes: bytes, content_type: str) -> SearchRespons
     log.info("Prefilter: %d → %d releases", before_count, len(releases))
 
     # 4. LLM ranking
-    likeliness, discarded = rank_results(releases, conversation)
+    likeliness, discarded = rank_results(releases, conversation, media_type)
     log.info("Ranking: %d ordered, %d discarded", len(likeliness), len(discarded))
 
     # 5. Build ordered results

@@ -1,4 +1,5 @@
 import os
+from difflib import SequenceMatcher
 
 import requests
 
@@ -61,65 +62,119 @@ def prefilter(releases: list[dict], candidate_artists: list[str]) -> list[dict]:
     return filtered if filtered else releases
 
 
+_MEDIA_TYPE_TO_FORMAT = {"vinyl": "Vinyl", "cd": "CD"}
+
+_SANITY_THRESHOLD = 0.4
+
+
+def _best_similarity(candidates: list[str], text: str) -> float:
+    """Return the highest SequenceMatcher ratio between any candidate and text."""
+    text_lower = text.lower()
+    return max(
+        (SequenceMatcher(None, c.lower(), text_lower).ratio() for c in candidates),
+        default=0.0,
+    )
+
+
+def _sanity_check(
+    results: list[dict],
+    candidate_albums: list[str],
+    candidate_artists: list[str],
+    threshold: float = _SANITY_THRESHOLD,
+) -> list[dict]:
+    """Keep only results where artist AND album have similarity >= threshold."""
+    passed = []
+    for r in results:
+        title = r.get("title", "")
+        # Discogs titles are "Artist - Album"
+        parts = title.split(" - ", 1)
+        r_artist = parts[0] if parts else title
+        r_album = parts[1] if len(parts) > 1 else ""
+
+        artist_sim = _best_similarity(candidate_artists, r_artist)
+        album_sim = _best_similarity(candidate_albums, r_album)
+
+        if artist_sim >= threshold and album_sim >= threshold:
+            passed.append(r)
+        else:
+            log.debug(
+                "Sanity check dropped: '%s' (artist_sim=%.2f, album_sim=%.2f)",
+                title, artist_sim, album_sim,
+            )
+    return passed
+
+
 def search_with_strategy(
     candidate_albums: list[str],
     candidate_artists: list[str],
     label_meta: dict,
+    media_type: str = "vinyl",
 ) -> tuple[list[dict], str, list[str]]:
     """Try progressively looser search strategies. Returns (releases, strategy_used, strategies_tried)."""
     tried: list[str] = []
+    fmt = {"format": _MEDIA_TYPE_TO_FORMAT[media_type]}
+
+    def _try(results: list[dict], strategy: str) -> list[dict] | None:
+        """Apply sanity check; return sane results or None to fall through."""
+        sane = _sanity_check(results, candidate_albums, candidate_artists)
+        if sane:
+            log.info("Sanity check passed: %d/%d kept for '%s'", len(sane), len(results), strategy)
+            return sane
+        log.warning("Sanity check failed for '%s' (%d results all dropped), falling through", strategy, len(results))
+        tried.append(f"{strategy} (sanity fail)")
+        return None
 
     # 1. Catalog number + label (most precise)
     if label_meta.get("catno"):
-        params = {"catno": label_meta["catno"]}
+        params = {"catno": label_meta["catno"], **fmt}
         if label_meta.get("label"):
             params["label"] = label_meta["label"]
         strategy = f"catno='{label_meta['catno']}'" + (
             f" + label='{label_meta['label']}'" if "label" in params else ""
         )
-        tried.append(strategy)
         log.info("Strategy 1: catno search — %s", params)
         results = discogs_search(**params)
         if results:
-            log.info("Strategy 1 hit: %d results", len(results))
-            return results, strategy, tried
+            sane = _try(results, strategy)
+            if sane:
+                return sane, strategy, tried
 
         if label_meta.get("label"):
             strategy_1b = f"catno='{label_meta['catno']}'"
-            tried.append(strategy_1b)
             log.info("Strategy 1b: catno only (dropping label)")
-            results = discogs_search(catno=label_meta["catno"])
+            results = discogs_search(catno=label_meta["catno"], **fmt)
             if results:
-                log.info("Strategy 1b hit: %d results", len(results))
-                return results, strategy_1b, tried
+                sane = _try(results, strategy_1b)
+                if sane:
+                    return sane, strategy_1b, tried
 
     # 2. Freeform query (q) with album + artist
     for album in candidate_albums:
         for artist in candidate_artists:
             query = f"{artist} {album}"
             strategy = f"q='{query}'"
-            tried.append(strategy)
             log.info("Strategy 2: freeform q='%s'", query)
-            results = discogs_search(q=query)
+            results = discogs_search(q=query, **fmt)
             if results:
-                log.info("Strategy 2 hit: %d results", len(results))
-                return results, strategy, tried
+                sane = _try(results, strategy)
+                if sane:
+                    return sane, strategy, tried
 
     # 3. Strict release_title + artist
     for album in candidate_albums:
         for artist in candidate_artists:
             strategy = f"release_title='{album}' + artist='{artist}'"
-            tried.append(strategy)
             log.info("Strategy 3: release_title='%s' artist='%s'", album, artist)
-            results = discogs_search(artist=artist, release_title=album)
+            results = discogs_search(artist=artist, release_title=album, **fmt)
             if results:
-                log.info("Strategy 3 hit: %d results", len(results))
-                return results, strategy, tried
+                sane = _try(results, strategy)
+                if sane:
+                    return sane, strategy, tried
 
     # 4. Artist-only search, fuzzy match titles
     for artist in candidate_artists:
         log.info("Strategy 4: artist-only '%s'", artist)
-        artist_results = discogs_search(artist=artist)
+        artist_results = discogs_search(artist=artist, **fmt)
         if not artist_results:
             tried.append(f"artist='{artist}' (no results)")
             continue

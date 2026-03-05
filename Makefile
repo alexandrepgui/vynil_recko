@@ -1,4 +1,4 @@
-.PHONY: install backend frontend dev stop test
+.PHONY: install backend frontend dev docker-dev stop test
 
 install:
 	cd backend && pip3 install --break-system-packages -r requirements.txt
@@ -15,6 +15,9 @@ dev:
 	$(MAKE) backend & \
 	$(MAKE) frontend & \
 	for pid in $$(jobs -p); do wait $$pid || exit $$?; done
+
+docker-dev:
+	docker compose up --build
 
 test:
 	cd backend && python3 -m pytest tests/ -v
