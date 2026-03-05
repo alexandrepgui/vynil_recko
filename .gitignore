@@ -1,0 +1,11 @@
+.env
+__pycache__/
+.ipynb_checkpoints/
+node_modules/
+dist/
+backend/logs/
+backend/.cache/
+.venv/
+.pytest_cache/
+.claude/
+img/
