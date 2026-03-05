@@ -1,6 +1,6 @@
 import type { Batch, BatchItem, MediaType, SearchResponse } from './types';
 
-export async function searchByImage(file: File, mediaType: MediaType = 'vinyl'): Promise<SearchResponse> {
+export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', signal?: AbortSignal): Promise<SearchResponse> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('media_type', mediaType);
@@ -8,6 +8,7 @@ export async function searchByImage(file: File, mediaType: MediaType = 'vinyl'):
   const resp = await fetch('/api/search', {
     method: 'POST',
     body: formData,
+    signal,
   });
 
   if (!resp.ok) {

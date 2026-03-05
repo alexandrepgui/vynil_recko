@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './App.css';
 import { searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
@@ -15,20 +15,37 @@ export default function App() {
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const handleFileSelected = async (file: File) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setError(null);
     setResponse(null);
 
     try {
-      const data = await searchByImage(file, mediaType);
+      const data = await searchByImage(file, mediaType, controller.signal);
       setResponse(data);
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
+  };
+
+  const handleClear = () => {
+    setResponse(null);
+    setError(null);
   };
 
   return (
@@ -78,12 +95,20 @@ export default function App() {
 
       {mode === 'single' && (
         <>
-          <ImageUpload onFileSelected={handleFileSelected} isLoading={isLoading} mediaType={mediaType} />
+          <ImageUpload
+            onFileSelected={handleFileSelected}
+            onClear={handleClear}
+            isLoading={isLoading}
+            mediaType={mediaType}
+          />
 
           {isLoading && (
             <div className="loading">
               <div className="spinner" />
               <p>Analyzing image and searching Discogs... This may take up to 30 seconds.</p>
+              <button className="btn btn-cancel" onClick={handleCancel}>
+                Cancel
+              </button>
             </div>
           )}
 

@@ -30,7 +30,6 @@
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
-  margin-bottom: 2rem;
 }
 
 .upload-zone:hover,
@@ -57,6 +56,50 @@
   max-height: 240px;
   max-width: 100%;
   border-radius: 8px;
+}
+
+/* Upload actions (submit / clear) */
+.upload-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 1.5rem;
+}
+
+.btn-submit {
+  background: #4a90d9;
+  color: #fff;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.btn-submit:hover {
+  background: #3a7bc8;
+}
+
+.btn-clear {
+  background: #f0f0f0;
+  color: #555;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.95rem;
+}
+
+.btn-clear:hover {
+  background: #e0e0e0;
+}
+
+/* Cancel button */
+.btn-cancel {
+  background: none;
+  color: #c0392b;
+  font-size: 0.85rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid #c0392b;
+  margin-top: 0.5rem;
+}
+
+.btn-cancel:hover {
+  background: #fdecea;
 }
 
 /* Loading */
