@@ -166,6 +166,9 @@
   font-size: 0.78rem;
   color: #444;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Buttons */
