@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from models import DiscogsResult, LabelData, SearchResponse
-from services.discogs import prefilter, search_with_strategy
+from services.discogs import filter_by_format, prefilter, search_with_strategy
 from services.vision import rank_results, read_label_image
 from logger import get_logger
 
@@ -49,6 +49,7 @@ def process_single_image(image_bytes: bytes, content_type: str, media_type: str 
 
     # 3. Pre-filter
     before_count = len(releases)
+    releases = filter_by_format(releases, media_type)
     releases = prefilter(releases, candidate_artists)
     log.info("Prefilter: %d → %d releases", before_count, len(releases))
 

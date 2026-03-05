@@ -64,6 +64,20 @@ def prefilter(releases: list[dict], candidate_artists: list[str]) -> list[dict]:
 _MEDIA_TYPE_TO_FORMAT = {"vinyl": "Vinyl", "cd": "CD"}
 
 
+def filter_by_format(releases: list[dict], media_type: str) -> list[dict]:
+    """Drop results whose format list doesn't contain the expected format."""
+    expected = _MEDIA_TYPE_TO_FORMAT[media_type]
+    filtered = [
+        r for r in releases
+        if any(expected in fmt for fmt in r.get("format", []))
+    ]
+    if filtered:
+        log.info("Format filter (%s): %d → %d", expected, len(releases), len(filtered))
+    else:
+        log.warning("Format filter (%s) dropped ALL %d results, keeping originals", expected, len(releases))
+    return filtered if filtered else releases
+
+
 def search_with_strategy(
     candidate_albums: list[str],
     candidate_artists: list[str],
