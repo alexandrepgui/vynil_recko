@@ -7,7 +7,9 @@ backend/logs/
 backend/.cache/
 .venv/
 .pytest_cache/
-.claude/
+backend/.coverage
+backend/coverage.json
+backend/.uploads/
 img/
 DISCOGS_CREDENTIALS.md
 postman/

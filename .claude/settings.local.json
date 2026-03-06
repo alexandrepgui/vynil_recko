@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create vite@latest frontend -- --template react-ts)",
+      "Bash(pip3 install -r requirements.txt)",
+      "Bash(pip3 install --break-system-packages -r \"/Users/alexandreguimaraes/Documents/Personal Projects/vynil-recko/backend/requirements.txt\")",
+      "Bash(kill 27201)",
+      "Bash(brew install imagemagick)",
+      "Bash(pip3 install pytest)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pip3 install --break-system-packages --trusted-host pypi.org --trusted-host files.pythonhosted.org pytest)",
+      "Bash(lsof -ti:8000)",
+      "Bash(xargs kill)",
+      "Bash(docker exec vynil-recko-mongo-1 mongosh vinyl_recko --quiet --eval ':*)",
+      "Bash(done)",
+      "Skill(keybindings-help)",
+      "Bash(gsettings list-recursively:*)",
+      "Bash(setxkbmap:*)",
+      "Bash(xinput list:*)",
+      "Bash(gsettings set:*)"
+    ]
+  }
+}
