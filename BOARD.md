@@ -81,6 +81,14 @@
 
 ---
 
+---
+
+## In Progress
+
+_(empty)_
+
+## Awaiting Validation
+
 ### T6: LLM Cost Tracking & Provider Abstraction
 
 **Goal:** Implement LLM usage monitoring, cost tracking, and a provider-agnostic abstraction layer supporting OpenRouter and Google AI (Gemini), configurable via environment variable.
@@ -104,12 +112,6 @@
 - `backend/main.py` (register new router)
 
 ---
-
-## In Progress
-
-_(empty)_
-
-## Awaiting Validation
 
 ### T1: Test Pipeline & CI/CD
 
