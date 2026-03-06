@@ -28,12 +28,22 @@ export interface DiscogsResult {
   cover_image: string | null;
 }
 
+export interface DebugInfo {
+  cache_hit: boolean;
+  strategies_tried: string[];
+  timing_ms: Record<string, number>;
+  llm_label_response: Record<string, unknown>;
+  prefilter?: { before: number; after: number };
+  ranking?: { likeliness: number[]; discarded: number[] };
+}
+
 export interface SearchResponse {
   label_data: LabelData;
   strategy: string;
   results: DiscogsResult[];
   total: number;
   item_id: string | null;
+  debug: DebugInfo | null;
 }
 
 export interface Batch {
@@ -57,4 +67,6 @@ export interface BatchItem {
   strategy: string | null;
   review_status: 'unreviewed' | 'accepted' | 'skipped';
   accepted_release_id: number | null;
+  image_url: string | null;
+  debug: DebugInfo | null;
 }

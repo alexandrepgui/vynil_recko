@@ -10,3 +10,4 @@ backend/.cache/
 .claude/
 img/
 DISCOGS_CREDENTIALS.md
+postman/

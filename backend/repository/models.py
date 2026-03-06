@@ -76,6 +76,8 @@ class BatchItem:
     strategy: str | None = None
     review_status: str = "unreviewed"  # unreviewed | accepted | skipped
     accepted_release_id: int | None = None
+    image_url: str | None = None
+    debug: dict | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     processed_at: str | None = None
 
@@ -95,6 +97,8 @@ class BatchItem:
             strategy=data.get("strategy"),
             review_status=data.get("review_status", "unreviewed"),
             accepted_release_id=data.get("accepted_release_id"),
+            image_url=data.get("image_url"),
+            debug=data.get("debug"),
             created_at=data.get("created_at", ""),
             processed_at=data.get("processed_at"),
         )

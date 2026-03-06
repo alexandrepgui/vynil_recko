@@ -120,7 +120,7 @@ export default function App() {
             <>
               <div className="search-info">
                 <span>{response.total} release{response.total !== 1 ? 's' : ''} found</span>
-                <span className="strategy">Strategy: {response.strategy}</span>
+
               </div>
               <ResultsList results={response.results} itemId={response.item_id} />
             </>

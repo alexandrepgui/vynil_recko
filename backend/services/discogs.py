@@ -204,6 +204,61 @@ def search_with_strategy(
     return [], "exhausted all strategies", tried
 
 
+def score_by_metadata(releases: list[dict], label_meta: dict) -> list[dict]:
+    """Filter releases by deterministic year/country/label scoring.
+
+    Each release scores 0-3 points (1 per matching field).
+    Only the highest-scoring tier is kept.
+    If LLM provided no scorable fields, returns releases unchanged.
+    """
+    llm_year = (label_meta.get("year") or "").strip().lower()
+    llm_country = (label_meta.get("country") or "").strip().lower()
+    llm_label = (label_meta.get("label") or "").strip().lower()
+
+    if not llm_year and not llm_country and not llm_label:
+        log.debug("score_by_metadata: no year/country/label from LLM, skipping")
+        return releases
+
+    def _score(r: dict) -> int:
+        score = 0
+        if llm_year:
+            r_year = str(r.get("year", "")).strip().lower()
+            if r_year == llm_year:
+                score += 1
+        if llm_country:
+            r_country = (r.get("country") or "").strip().lower()
+            if r_country == llm_country:
+                score += 1
+        if llm_label:
+            r_labels = [lbl.strip().lower() for lbl in r.get("label", [])]
+            if llm_label in r_labels:
+                score += 1
+        return score
+
+    scored = [(r, _score(r)) for r in releases]
+    max_score = max(s for _, s in scored)
+
+    if max_score == 0:
+        log.info("score_by_metadata: no matches (year=%r, country=%r, label=%r), keeping all %d",
+                 llm_year, llm_country, llm_label, len(releases))
+        return releases
+
+    filtered = [r for r, s in scored if s == max_score]
+    log.info("score_by_metadata: %d → %d (kept score=%d, year=%r, country=%r, label=%r)",
+             len(releases), len(filtered), max_score, llm_year, llm_country, llm_label)
+    return filtered
+
+
+def get_marketplace_stats(release_id: int) -> dict:
+    """Fetch marketplace price stats for a release."""
+    resp = requests.get(
+        f"{DISCOGS_BASE_URL}/marketplace/stats/{release_id}",
+        headers=_headers(),
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_identity() -> str:
     """Get the authenticated Discogs username via /oauth/identity."""
     resp = requests.get(

@@ -121,17 +121,18 @@ class MongoRepository:
         label_data: dict,
         results: list[dict],
         strategy: str,
+        debug: dict | None = None,
     ) -> None:
-        self._items.update_one(
-            {"item_id": item_id},
-            {"$set": {
-                "status": "completed",
-                "label_data": label_data,
-                "results": results,
-                "strategy": strategy,
-                "processed_at": datetime.now(timezone.utc).isoformat(),
-            }},
-        )
+        update: dict = {
+            "status": "completed",
+            "label_data": label_data,
+            "results": results,
+            "strategy": strategy,
+            "processed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if debug is not None:
+            update["debug"] = debug
+        self._items.update_one({"item_id": item_id}, {"$set": update})
 
     def update_item_error(self, item_id: str, error: str) -> None:
         self._items.update_one(

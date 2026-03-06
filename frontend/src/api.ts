@@ -122,6 +122,14 @@ export async function undoReviewItem(itemId: string): Promise<void> {
   if (!resp.ok) throw new Error(`Failed to undo review (${resp.status})`);
 }
 
+// ── Price ─────────────────────────────────────────────────────────────────
+
+export async function getPrice(releaseId: number): Promise<{ lowest_price: number | null; num_for_sale: number }> {
+  const resp = await fetch(`/api/price/${releaseId}`);
+  if (!resp.ok) return { lowest_price: null, num_for_sale: 0 };
+  return resp.json();
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export async function getAuthStatus(): Promise<AuthStatus> {

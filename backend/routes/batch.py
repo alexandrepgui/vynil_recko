@@ -5,12 +5,14 @@ import zipfile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile
 
+from config import UPLOADS_DIR
 from deps import get_repo
 from logger import get_logger
 from models import MediaType, ReviewAction, ReviewStatus
 from repository import Batch, BatchItem, SearchRecord
 from repository.mongo import MongoRepository
 from services.search import process_single_image
+from utils import save_upload_image
 
 log = get_logger("routes.batch")
 
@@ -18,7 +20,6 @@ router = APIRouter()
 
 VALID_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 _EXT_TO_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
-MAX_ZIP_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 def _extract_images_from_zip(zip_bytes: bytes) -> list[tuple[str, bytes, str]]:
@@ -57,6 +58,7 @@ def _process_batch(
                 label_data=response.label_data.model_dump(),
                 results=[r.model_dump() for r in response.results],
                 strategy=response.strategy,
+                debug=response.debug,
             )
             repo.increment_batch_processed(batch_id)
             record.status = "success"
@@ -92,8 +94,6 @@ async def create_batch(
         raise HTTPException(400, "Only .zip files are accepted.")
 
     zip_bytes = await file.read()
-    if len(zip_bytes) > MAX_ZIP_SIZE:
-        raise HTTPException(413, "Zip file too large. Maximum 100MB.")
 
     image_files = _extract_images_from_zip(zip_bytes)
     if not image_files:
@@ -109,6 +109,7 @@ async def create_batch(
     filenames: dict[str, str] = {}
     for filename, img_bytes, content_type in image_files:
         item = BatchItem(batch_id=batch.batch_id, image_filename=filename)
+        item.image_url = save_upload_image(item.item_id, filename, img_bytes)
         repo.save_item(item)
         task_items.append((item.item_id, img_bytes, content_type))
         filenames[item.item_id] = filename

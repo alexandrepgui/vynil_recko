@@ -61,6 +61,7 @@ class SearchResponse(BaseModel):
     results: list[DiscogsResult]
     total: int
     item_id: str | None = None  # batch_item ID for review tracking
+    debug: dict | None = None
 
 
 class ReviewAction(BaseModel):

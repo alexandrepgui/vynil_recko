@@ -10,7 +10,7 @@ Provides endpoints for:
 import os
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse
 
 from logger import get_logger
 from services.discogs_auth import (
@@ -90,14 +90,9 @@ async def oauth_callback(
 
     log.info("OAuth completed for user: %s", tokens.username)
 
-    return HTMLResponse(
-        content="""<!DOCTYPE html>
-<html><head><title>Vinyl Recko — Connected</title></head>
-<body>
-<p>Connected to Discogs! This window will close automatically.</p>
-<script>window.close();</script>
-</body></html>"""
-    )
+    # Redirect back to the frontend app
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    return RedirectResponse(url=frontend_url)
 
 
 @router.post("/logout")

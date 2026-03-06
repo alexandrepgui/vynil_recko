@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 # All available via OpenRouter (https://openrouter.ai/models)
@@ -15,10 +16,14 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 CACHE_MAX_ENTRIES = 200
 
+UPLOADS_DIR = Path(__file__).resolve().parent / ".uploads"
+
 DISCOGS_BASE_URL = "https://api.discogs.com"
 DISCOGS_USER_AGENT = "VynilRecko/1.0"
 
 MAX_RANKING_RESULTS = 20
+
+DEV_MODE = os.getenv("DEV_MODE", "").lower() in ("1", "true", "yes")
 
 # Single-image searches are stored as BatchItems with this sentinel batch_id
 # so they appear in the unified review queue alongside batch items.
@@ -32,11 +37,14 @@ VINYL_LABEL_READING_PROMPT = (
     "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
     "For albums: include the full title, shorter versions without subtitles, and any plausible variations. "
     "For artists: include variations (e.g. with/without featured artists). "
+    "Do NOT include individual track or song names — only album titles. "
+    "If the album or artist name is not visible on the label, use \"Not present in label\" as the only album entry. "
+    "Keep in mind that albums may be self-titled. "
     "Also extract any optional metadata visible on the label. "
     "Output ONLY a JSON object with these keys:\n"
-    '- "albums": array of strings (required)\n'
-    '- "artists": array of strings (required)\n'
-    '- "country": string or null (if visible, e.g. "Made in U.S.A.")\n'
+    '- "albums": array of strings (required, use ["Not present in label"] if not visible)\n'
+    '- "artists": array of strings (required, use ["Not present in label"] if not visible)\n'
+    '- "country": string or null (ONLY if explicitly printed on the label — do NOT guess from language or artist origin. Use Discogs-style names: "Brazil", "US", "UK", "Europe", "Japan", etc.)\n'
     '- "format": string or null (e.g. "LP", "45 RPM", "EP")\n'
     '- "label": string or null (record label name, e.g. "Columbia", "RCA")\n'
     '- "catno": string or null (catalog number)\n'
@@ -50,11 +58,14 @@ CD_LABEL_READING_PROMPT = (
     "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
     "For albums: include the full title, shorter versions without subtitles, and any plausible variations. "
     "For artists: include variations (e.g. with/without featured artists). "
+    "Do NOT include individual track or song names — only album titles. "
+    "If the album or artist name is not visible on the disc or case, use \"Not present in label\" as the only album entry. "
+    "Keep in mind that albums may be self-titled. "
     "Also extract any optional metadata visible on the disc or case. "
     "Output ONLY a JSON object with these keys:\n"
-    '- "albums": array of strings (required)\n'
-    '- "artists": array of strings (required)\n'
-    '- "country": string or null (if visible)\n'
+    '- "albums": array of strings (required, use ["Not present in label"] if not visible)\n'
+    '- "artists": array of strings (required, use ["Not present in label"] if not visible)\n'
+    '- "country": string or null (ONLY if explicitly printed on the disc or case — do NOT guess from language or artist origin. Use Discogs-style names: "Brazil", "US", "UK", "Europe", "Japan", etc.)\n'
     '- "format": string or null (e.g. "CD", "CD, Album", "CD, Single")\n'
     '- "label": string or null (record label name)\n'
     '- "catno": string or null (catalog number)\n'

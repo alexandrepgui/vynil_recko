@@ -9,8 +9,9 @@ from logger import get_logger
 from models import AddToCollectionRequest, MediaType, SearchResponse
 from repository import BatchItem, CollectionRecord, SearchRecord
 from repository.mongo import MongoRepository
-from services.discogs import add_to_collection
+from services.discogs import add_to_collection, get_marketplace_stats
 from services.search import process_single_image
+from utils import save_upload_image
 
 log = get_logger("routes.search")
 
@@ -84,7 +85,9 @@ async def search(
             label_data=response.label_data.model_dump(),
             results=[r.model_dump() for r in response.results],
             strategy=response.strategy,
+            debug=response.debug,
         )
+        item.image_url = save_upload_image(item.item_id, file.filename or "upload.jpg", image_bytes)
         repo.save_item(item)
         response.item_id = item.item_id
     except Exception as e:
@@ -142,3 +145,23 @@ async def add_to_collection_endpoint(
 
     log.info("Release %d added to collection: instance_id=%s", body.release_id, instance.get("instance_id"))
     return instance
+
+
+@router.get("/api/price/{release_id}")
+async def get_price(release_id: int):
+    """Fetch marketplace price stats for a Discogs release."""
+    try:
+        stats = get_marketplace_stats(release_id)
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 502
+        if status == 404:
+            raise HTTPException(status_code=404, detail="Release not found")
+        raise HTTPException(status_code=502, detail=f"Discogs API error: {e}")
+    except Exception as e:
+        log.error("Failed to fetch marketplace stats for %d: %s", release_id, e)
+        raise HTTPException(status_code=502, detail=f"Discogs API error: {e}")
+
+    return {
+        "lowest_price": stats.get("lowest_price", {}).get("value") if isinstance(stats.get("lowest_price"), dict) else stats.get("lowest_price"),
+        "num_for_sale": stats.get("num_for_sale", 0),
+    }

@@ -18,6 +18,7 @@ services:
       - .env
     environment:
       - MONGO_URI=mongodb://mongo:27017
+      - DEV_MODE=true
     depends_on:
       - mongo
 

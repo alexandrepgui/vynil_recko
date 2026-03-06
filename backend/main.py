@@ -4,7 +4,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from config import UPLOADS_DIR
 from logger import get_logger, setup_logging
 from routes.auth import router as auth_router
 from routes.search import router as search_router
@@ -27,6 +29,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(search_router)
 app.include_router(batch_router)
+
+UPLOADS_DIR.mkdir(exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 @app.middleware("http")

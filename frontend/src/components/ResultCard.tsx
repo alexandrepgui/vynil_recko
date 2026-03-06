@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from 'react';
-import { addToCollection, reviewItemGlobal, undoReviewItem } from '../api';
+import { type ReactNode, useEffect, useState } from 'react';
+import { addToCollection, getPrice, reviewItemGlobal, undoReviewItem } from '../api';
 import type { DiscogsResult } from '../types';
 import { parseDiscogsTitle } from '../utils';
 
@@ -14,8 +14,14 @@ interface Props {
 
 export default function ResultCard({ result, itemId, renderActions, className }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'added' | 'error' | 'dismissed'>('idle');
+  const [price, setPrice] = useState<{ lowest_price: number | null; num_for_sale: number } | null>(null);
 
   const { artist, album: albumTitle } = parseDiscogsTitle(result.title);
+
+  useEffect(() => {
+    if (!result.discogs_id) return;
+    getPrice(result.discogs_id).then(setPrice).catch(() => {});
+  }, [result.discogs_id]);
 
   const handleAddToCollection = async () => {
     if (!result.discogs_id || status === 'loading') return;
@@ -78,6 +84,9 @@ export default function ResultCard({ result, itemId, renderActions, className }:
           {result.format && <span>{result.format}</span>}
           {result.label && <span>{result.label}</span>}
           {result.catno && <span>Cat# {result.catno}</span>}
+          {price?.lowest_price != null && (
+            <span className="result-price">From ${price.lowest_price.toFixed(2)} ({price.num_for_sale} for sale)</span>
+          )}
         </div>
 
         {renderActions ? (
