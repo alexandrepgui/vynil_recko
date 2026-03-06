@@ -144,6 +144,77 @@ class TestGoogleAIProvider:
             provider = GoogleAIProvider(api_key="test-key")
         assert provider.provider_name == "google"
 
+    def test_system_message_sets_instruction(self):
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "ok"
+        mock_response.usage_metadata.prompt_token_count = 10
+        mock_response.usage_metadata.candidates_token_count = 5
+        mock_genai_client.models.generate_content.return_value = mock_response
+
+        with patch("services.llm.google_ai.genai.Client", return_value=mock_genai_client):
+            from services.llm.google_ai import GoogleAIProvider
+            provider = GoogleAIProvider(api_key="test-key")
+
+        provider.chat(
+            [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
+            model="gemini-2.5-flash",
+        )
+
+        call_kwargs = mock_genai_client.models.generate_content.call_args
+        config = call_kwargs[1]["config"]
+        assert config.system_instruction == "You are a helpful assistant."
+
+    def test_system_message_non_string_content_ignored(self):
+        from services.llm.google_ai import _translate_messages
+
+        contents, system_instruction = _translate_messages([
+            {"role": "system", "content": [{"type": "text", "text": "sys"}]},
+            {"role": "user", "content": "hello"},
+        ])
+        assert system_instruction is None
+        assert len(contents) == 1
+
+    def test_multipart_image_content(self):
+        import base64
+        from services.llm.google_ai import _translate_messages
+
+        fake_image = base64.b64encode(b"fake-jpeg").decode()
+        messages = [
+            {"role": "user", "content": [
+                {"type": "text", "text": "What is this?"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{fake_image}"}},
+            ]},
+        ]
+        contents, system_instruction = _translate_messages(messages)
+        assert len(contents) == 1
+        assert len(contents[0].parts) == 2
+
+    def test_multipart_image_url_non_data_uri(self):
+        from services.llm.google_ai import _translate_messages
+
+        messages = [
+            {"role": "user", "content": [
+                {"type": "text", "text": "Describe"},
+                {"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}},
+            ]},
+        ]
+        contents, _ = _translate_messages(messages)
+        assert len(contents[0].parts) == 2
+
+    def test_assistant_role_mapped_to_model(self):
+        from services.llm.google_ai import _translate_messages
+
+        contents, _ = _translate_messages([
+            {"role": "assistant", "content": "I can help with that."},
+            {"role": "user", "content": "thanks"},
+        ])
+        assert contents[0].role == "model"
+        assert contents[1].role == "user"
+
 
 # ── Factory ──────────────────────────────────────────────────────────────────
 
