@@ -35,7 +35,8 @@ def client(mock_repo):
     from main import app
 
     app.dependency_overrides[get_repo] = lambda: mock_repo
-    yield TestClient(app)
+    with patch("services.search.get_repo", return_value=mock_repo):
+        yield TestClient(app)
     app.dependency_overrides.clear()
 
 
