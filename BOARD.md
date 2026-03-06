@@ -81,6 +81,30 @@
 
 ---
 
+### T6: LLM Cost Tracking & Provider Abstraction
+
+**Goal:** Implement LLM usage monitoring, cost tracking, and a provider-agnostic abstraction layer supporting OpenRouter and Google AI (Gemini), configurable via environment variable.
+
+**Details:**
+- Research OpenRouter token usage metrics from API response (`usage` field: prompt/completion/total tokens, cost) in `backend/services/vision.py`
+- Research Google AI (Gemini) direct API pricing vs OpenRouter; document cost comparison to determine if direct access is cheaper
+- Refactor `vision.py` and `config.py` into a provider abstraction layer: supports OpenRouter and Google AI, unified interface for chat completions with vision, configurable via `LLM_PROVIDER=openrouter|google` env var
+- Capture token usage after each LLM call (label reading and ranking) for both providers
+- Persist per-request records in a new MongoDB `llm_usage` collection: `timestamp`, `provider`, `model`, `operation`, `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`, `batch_id`/`item_id`, `cache_hit`
+- Cache hits must not generate cost entries
+- Add `GET /api/usage` endpoint returning aggregated stats (total cost, cost per day, cost per model, average tokens per request)
+
+**Files to create/modify:**
+- `backend/config.py`
+- `backend/services/vision.py`
+- `backend/services/search.py`
+- `backend/repository/mongo.py`
+- `backend/repository/models.py`
+- `backend/routes/usage.py` (create)
+- `backend/main.py` (register new router)
+
+---
+
 ## In Progress
 
 _(empty)_
