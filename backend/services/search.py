@@ -91,10 +91,9 @@ def process_single_image(
     candidate_albums = label_data.get("albums", [])
     candidate_artists = label_data.get("artists", [])
 
-    # Handle "Not present in label" — treat as self-titled album
-    _sentinel = "Not present in label"
-    albums_missing = all(a.strip().lower() == _sentinel.lower() for a in candidate_albums) if candidate_albums else True
-    artists_missing = all(a.strip().lower() == _sentinel.lower() for a in candidate_artists) if candidate_artists else True
+    # Handle null / empty — treat as self-titled album
+    albums_missing = candidate_albums is None or len(candidate_albums) == 0
+    artists_missing = candidate_artists is None or len(candidate_artists) == 0
 
     if albums_missing and not artists_missing:
         candidate_albums = list(candidate_artists)

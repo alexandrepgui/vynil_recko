@@ -90,7 +90,7 @@ class GoogleAIProvider:
             content=content,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
+            total_tokens=usage.total_token_count if usage else 0,
             model=model,
             provider=self.provider_name,
         )

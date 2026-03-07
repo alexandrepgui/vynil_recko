@@ -105,11 +105,15 @@ class MongoRepository:
         cursor = self._items.find(query, {"_id": 0}).sort("created_at", 1)
         return [BatchItem.from_dict(doc) for doc in cursor]
 
-    def find_all_items(self, review_status: str | None = None) -> list[BatchItem]:
-        """Query across all batches, optionally filtered by review_status."""
+    def find_all_items(
+        self, review_status: str | None = None, status: str | None = None,
+    ) -> list[BatchItem]:
+        """Query across all batches, optionally filtered by review_status and/or status."""
         query: dict = {}
         if review_status is not None:
             query["review_status"] = review_status
+        if status is not None:
+            query["status"] = status
         cursor = self._items.find(query, {"_id": 0}).sort("created_at", 1)
         return [BatchItem.from_dict(doc) for doc in cursor]
 

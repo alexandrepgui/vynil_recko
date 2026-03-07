@@ -681,3 +681,219 @@
   background: #eee;
   color: #666;
 }
+
+/* Wrong button */
+.btn-wrong {
+  background: #e65100;
+  color: #fff;
+}
+
+.btn-wrong:hover {
+  background: #bf360c;
+}
+
+/* Issues view */
+.issues-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.issues-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  color: #333;
+}
+
+.issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.issues-card {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fafafa;
+  align-items: center;
+}
+
+.issues-card-image {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: #eee;
+}
+
+.issues-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.issues-card-filename {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.issues-card-label {
+  font-size: 0.82rem;
+  color: #666;
+  font-style: italic;
+}
+
+.issues-card-match {
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.issues-card-error {
+  font-size: 0.78rem;
+  color: #c0392b;
+}
+
+.issues-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Collection view */
+.collection-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.collection-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.collection-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.collection-search:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.collection-sort {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.collection-sort-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+.collection-sort-order {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.collection-info {
+  font-size: 0.85rem;
+  color: #666;
+  padding: 0 0.25rem;
+}
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.collection-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fafafa;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.collection-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.collection-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+  background: #eee;
+}
+
+.collection-cover-placeholder {
+  background: #e0e0e0;
+}
+
+.collection-card-info {
+  padding: 0.5rem 0.6rem;
+}
+
+.collection-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collection-card-artist {
+  font-size: 0.78rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.collection-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.collection-card-meta span {
+  background: #eee;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  color: #555;
+}
+
+.collection-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.collection-page-info {
+  font-size: 0.85rem;
+  color: #666;
+}

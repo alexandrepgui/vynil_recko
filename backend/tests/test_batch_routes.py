@@ -181,7 +181,21 @@ def test_get_all_review_items_filtered(client, mock_repo):
     mock_repo.find_all_items.return_value = []
     resp = client.get("/api/review/items?review_status=skipped")
     assert resp.status_code == 200
-    mock_repo.find_all_items.assert_called_once_with(review_status="skipped")
+    mock_repo.find_all_items.assert_called_once_with(review_status="skipped", status=None)
+
+
+def test_get_all_review_items_filtered_by_status(client, mock_repo):
+    mock_repo.find_all_items.return_value = []
+    resp = client.get("/api/review/items?status=error")
+    assert resp.status_code == 200
+    mock_repo.find_all_items.assert_called_once_with(review_status=None, status="error")
+
+
+def test_get_all_review_items_filtered_by_both(client, mock_repo):
+    mock_repo.find_all_items.return_value = []
+    resp = client.get("/api/review/items?review_status=wrong&status=completed")
+    assert resp.status_code == 200
+    mock_repo.find_all_items.assert_called_once_with(review_status="wrong", status="completed")
 
 
 # ── PATCH /api/review/items/{item_id} ───────────────────────────────────────

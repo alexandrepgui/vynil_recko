@@ -42,11 +42,14 @@ def _run_pipeline(label_data, discogs_results=None, ranking=None):
         return process_single_image(b"fake-image", "image/jpeg")
 
 
-def _make_label(albums=None, artists=None):
+_UNSET = object()
+
+
+def _make_label(albums=_UNSET, artists=_UNSET):
     """Build a minimal label_data dict."""
     return {
-        "albums": albums if albums is not None else ["Kind of Blue"],
-        "artists": artists if artists is not None else ["Miles Davis"],
+        "albums": ["Kind of Blue"] if albums is _UNSET else albums,
+        "artists": ["Miles Davis"] if artists is _UNSET else artists,
         "country": None, "format": None, "label": None, "catno": None, "year": None,
     }
 
@@ -83,24 +86,20 @@ class TestBuildDebug:
 
 class TestSelfTitledLogic:
     def test_album_missing_uses_artist_as_album(self):
-        resp = _run_pipeline(_make_label(albums=["Not present in label"], artists=["Miles Davis"]))
+        resp = _run_pipeline(_make_label(albums=None, artists=["Miles Davis"]))
         assert resp.label_data.albums == ["Miles Davis"]
 
     def test_artist_missing_uses_album_as_artist(self):
-        resp = _run_pipeline(_make_label(albums=["Kind of Blue"], artists=["Not present in label"]))
+        resp = _run_pipeline(_make_label(albums=["Kind of Blue"], artists=None))
         assert resp.label_data.artists == ["Kind of Blue"]
 
     def test_both_missing_raises(self):
         with pytest.raises(ValueError, match="Could not extract"):
-            _run_pipeline(_make_label(albums=["Not present in label"], artists=["Not present in label"]))
+            _run_pipeline(_make_label(albums=None, artists=None))
 
     def test_empty_albums_and_artists_raises(self):
         with pytest.raises(ValueError, match="Could not extract"):
             _run_pipeline(_make_label(albums=[], artists=[]))
-
-    def test_sentinel_case_insensitive(self):
-        resp = _run_pipeline(_make_label(albums=["not present in label"], artists=["Miles Davis"]))
-        assert resp.label_data.albums == ["Miles Davis"]
 
 
 # ── Cover image tiebreaker ────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { AuthStatus, Batch, BatchItem, MediaType, SearchResponse } from './types';
+import type { AuthStatus, Batch, BatchItem, CollectionResponse, MediaType, SearchResponse } from './types';
 
 export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', signal?: AbortSignal): Promise<SearchResponse> {
   const formData = new FormData();
@@ -71,7 +71,7 @@ export async function getBatchItems(
 export async function reviewItem(
   batchId: string,
   itemId: string,
-  reviewStatus: 'accepted' | 'skipped',
+  reviewStatus: 'accepted' | 'skipped' | 'wrong',
   acceptedReleaseId?: number,
 ): Promise<void> {
   const resp = await fetch(`/api/batch/${batchId}/items/${itemId}`, {
@@ -90,16 +90,20 @@ export async function reviewItem(
 
 export async function getAllReviewItems(
   reviewStatus?: string,
+  status?: string,
 ): Promise<BatchItem[]> {
-  const params = reviewStatus ? `?review_status=${reviewStatus}` : '';
-  const resp = await fetch(`/api/review/items${params}`);
+  const query = new URLSearchParams();
+  if (reviewStatus) query.set('review_status', reviewStatus);
+  if (status) query.set('status', status);
+  const qs = query.toString();
+  const resp = await fetch(`/api/review/items${qs ? `?${qs}` : ''}`);
   if (!resp.ok) throw new Error(`Failed to fetch review items (${resp.status})`);
   return resp.json();
 }
 
 export async function reviewItemGlobal(
   itemId: string,
-  reviewStatus: 'accepted' | 'skipped',
+  reviewStatus: 'accepted' | 'skipped' | 'wrong',
   acceptedReleaseId?: number,
 ): Promise<void> {
   const resp = await fetch(`/api/review/items/${itemId}`, {
@@ -120,6 +124,28 @@ export async function undoReviewItem(itemId: string): Promise<void> {
   });
 
   if (!resp.ok) throw new Error(`Failed to undo review (${resp.status})`);
+}
+
+// ── Collection (browse) ──────────────────────────────────────────────────
+
+export async function getCollection(
+  page: number = 1,
+  perPage: number = 50,
+  sort: string = 'artist',
+  sortOrder: string = 'asc',
+): Promise<CollectionResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: String(perPage),
+    sort,
+    sort_order: sortOrder,
+  });
+  const resp = await fetch(`/api/collection?${params}`);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
+  }
+  return resp.json();
 }
 
 // ── Price ─────────────────────────────────────────────────────────────────

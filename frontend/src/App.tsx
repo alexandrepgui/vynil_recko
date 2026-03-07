@@ -7,8 +7,10 @@ import ImageUpload from './components/ImageUpload';
 import ResultsList from './components/ResultsList';
 import BatchView from './components/BatchView';
 import ReviewView from './components/ReviewView';
+import IssuesView from './components/IssuesView';
+import CollectionView from './components/CollectionView';
 
-type Mode = 'single' | 'batch' | 'review';
+type Mode = 'single' | 'batch' | 'review' | 'issues' | 'collection';
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('single');
@@ -76,9 +78,21 @@ export default function App() {
         >
           Review
         </button>
+        <button
+          className={`mode-tab ${mode === 'issues' ? 'active' : ''}`}
+          onClick={() => setMode('issues')}
+        >
+          Issues
+        </button>
+        <button
+          className={`mode-tab ${mode === 'collection' ? 'active' : ''}`}
+          onClick={() => setMode('collection')}
+        >
+          Collection
+        </button>
       </div>
 
-      {mode !== 'review' && (
+      {mode !== 'review' && mode !== 'issues' && mode !== 'collection' && (
         <div className="media-type-toggle">
           <button
             className={`media-type-btn ${mediaType === 'vinyl' ? 'active' : ''}`}
@@ -131,6 +145,10 @@ export default function App() {
       {mode === 'batch' && <BatchView onGoToReview={() => setMode('review')} mediaType={mediaType} />}
 
       {mode === 'review' && <ReviewView />}
+
+      {mode === 'issues' && <IssuesView />}
+
+      {mode === 'collection' && <CollectionView />}
     </div>
   );
 }

@@ -102,6 +102,7 @@ class TestGoogleAIProvider:
         mock_response.text = '{"albums": ["Test"]}'
         mock_response.usage_metadata.prompt_token_count = 150
         mock_response.usage_metadata.candidates_token_count = 60
+        mock_response.usage_metadata.total_token_count = 210
         mock_genai_client.models.generate_content.return_value = mock_response
 
         with patch("services.llm.google_ai.genai.Client", return_value=mock_genai_client):

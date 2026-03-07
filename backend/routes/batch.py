@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Qu
 from config import UPLOADS_DIR
 from deps import get_repo
 from logger import get_logger
-from models import MediaType, ReviewAction, ReviewStatus
+from models import ItemStatus, MediaType, ReviewAction, ReviewStatus
 from repository import Batch, BatchItem, SearchRecord
 from repository.mongo import MongoRepository
 from services.search import process_single_image
@@ -158,9 +158,10 @@ async def review_batch_item(
 @router.get("/api/review/items")
 async def get_all_review_items(
     review_status: ReviewStatus | None = Query(None),
+    status: ItemStatus | None = Query(None),
     repo: MongoRepository = Depends(get_repo),
 ):
-    items = repo.find_all_items(review_status=review_status)
+    items = repo.find_all_items(review_status=review_status, status=status)
     return [item.to_dict() for item in items]
 
 

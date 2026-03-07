@@ -87,7 +87,7 @@ def _sanity_check(
     candidate_artists: list[str],
     threshold: float = _SANITY_THRESHOLD,
 ) -> list[dict]:
-    """Keep only results where artist AND album have similarity >= threshold."""
+    """Keep only results where artist OR album have similarity >= threshold."""
     passed = []
     for r in results:
         title = r.get("title", "")
@@ -99,7 +99,7 @@ def _sanity_check(
         artist_sim = _best_similarity(candidate_artists, r_artist)
         album_sim = _best_similarity(candidate_albums, r_album)
 
-        if artist_sim >= threshold and album_sim >= threshold:
+        if artist_sim >= threshold or album_sim >= threshold:
             passed.append(r)
         else:
             log.debug(
@@ -267,6 +267,30 @@ def get_identity() -> str:
     )
     resp.raise_for_status()
     return resp.json()["username"]
+
+
+def get_collection(
+    page: int = 1,
+    per_page: int = 50,
+    sort: str = "artist",
+    sort_order: str = "asc",
+) -> dict:
+    """Fetch the authenticated user's Discogs collection (folder 0 = all)."""
+    tokens = get_current_tokens()
+    username = tokens.username if tokens and tokens.username else get_identity()
+    log.info("Fetching collection page %d for user '%s'", page, username)
+    resp = requests.get(
+        f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/0/releases",
+        headers=_headers(),
+        params={
+            "page": page,
+            "per_page": per_page,
+            "sort": sort,
+            "sort_order": sort_order,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 def add_to_collection(release_id: int) -> dict:

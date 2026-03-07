@@ -1,4 +1,4 @@
-"""Tests for POST /api/collection and GET /api/price/{release_id}."""
+"""Tests for GET /api/collection, POST /api/collection, and GET /api/price/{release_id}."""
 
 from unittest.mock import MagicMock, patch
 
@@ -23,6 +23,84 @@ def client(mock_repo):
     app.dependency_overrides[get_repo] = lambda: mock_repo
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+# ── GET /api/collection (browse) ────────────────────────────────────────────
+
+DISCOGS_COLLECTION_RESPONSE = {
+    "pagination": {"page": 1, "pages": 3, "per_page": 50, "items": 120},
+    "releases": [
+        {
+            "instance_id": 100,
+            "date_added": "2024-01-15T10:00:00-08:00",
+            "basic_information": {
+                "id": 555,
+                "title": "Kind of Blue",
+                "year": 1959,
+                "artists": [{"name": "Miles Davis"}],
+                "genres": ["Jazz"],
+                "styles": ["Modal"],
+                "formats": [{"name": "LP"}],
+                "cover_image": "https://img.discogs.com/cover.jpg",
+            },
+        },
+    ],
+}
+
+
+def test_get_collection_success(client):
+    with patch("routes.collection.get_collection", return_value=DISCOGS_COLLECTION_RESPONSE):
+        resp = client.get("/api/collection")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["page"] == 1
+    assert body["pages"] == 3
+    assert body["total_items"] == 120
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert item["id"] == 555
+    assert item["title"] == "Kind of Blue"
+    assert item["artist"] == "Miles Davis"
+    assert item["year"] == 1959
+    assert item["genres"] == ["Jazz"]
+    assert item["format"] == "LP"
+    assert item["cover_image"] == "https://img.discogs.com/cover.jpg"
+
+
+def test_get_collection_with_params(client):
+    with patch("routes.collection.get_collection", return_value=DISCOGS_COLLECTION_RESPONSE) as mock:
+        resp = client.get("/api/collection?page=2&per_page=25&sort=year&sort_order=desc")
+    assert resp.status_code == 200
+    mock.assert_called_once_with(page=2, per_page=25, sort="year", sort_order="desc")
+
+
+def test_get_collection_401(client):
+    http_err = requests.HTTPError(response=MagicMock(status_code=401))
+    with patch("routes.collection.get_collection", side_effect=http_err):
+        resp = client.get("/api/collection")
+    assert resp.status_code == 401
+
+
+def test_get_collection_discogs_error(client):
+    http_err = requests.HTTPError(response=MagicMock(status_code=500))
+    with patch("routes.collection.get_collection", side_effect=http_err):
+        resp = client.get("/api/collection")
+    assert resp.status_code == 502
+
+
+def test_get_collection_unexpected_error(client):
+    with patch("routes.collection.get_collection", side_effect=RuntimeError("boom")):
+        resp = client.get("/api/collection")
+    assert resp.status_code == 502
+
+
+def test_get_collection_empty(client):
+    empty = {"pagination": {"page": 1, "pages": 1, "per_page": 50, "items": 0}, "releases": []}
+    with patch("routes.collection.get_collection", return_value=empty):
+        resp = client.get("/api/collection")
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+    assert resp.json()["total_items"] == 0
 
 
 # ── POST /api/collection ────────────────────────────────────────────────────

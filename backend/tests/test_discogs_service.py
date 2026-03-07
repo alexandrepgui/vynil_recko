@@ -96,14 +96,14 @@ class TestSanityCheck:
         assert len(passed) == 1
 
     def test_drops_bad_match(self):
-        results = [{"title": "Metallica - Master of Puppets"}]
+        results = [{"title": "ZZZXXX - QQQWWW"}]
         passed = _sanity_check(results, ["Kind of Blue"], ["Miles Davis"])
         assert len(passed) == 0
 
     def test_mixed_results(self):
         results = [
             {"title": "Miles Davis - Kind of Blue"},
-            {"title": "Metallica - Master of Puppets"},
+            {"title": "ZZZXXX - QQQWWW"},
         ]
         passed = _sanity_check(results, ["Kind of Blue"], ["Miles Davis"])
         assert len(passed) == 1

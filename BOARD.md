@@ -8,78 +8,7 @@
 
 ## Backlog
 
-### T2: "Wrong Record" Button + Issues Tab
-
-**Goal:** Add "Wrong" action button (layout: Wrong / Dismiss / Accept). Wrong records and errored items visible in a separate "Issues" tab for retry or manual add.
-
-**Details:**
-- Backend: add `WRONG = "wrong"` to `ReviewStatus` in `backend/models.py`
-- Frontend BatchReview: change action bar to `Wrong / Dismiss / Accept+Add`; "Wrong" calls `reviewItemGlobal(itemId, 'wrong')`
-- Frontend types: add `'wrong'` to `review_status` union
-- Backend route: add `status` query param to `GET /api/review/items` (currently only filters by `review_status`)
-- New `IssuesView.tsx` component: two sections — "Wrong matches" and "Errors"; shows image, label data, error; actions: Retry, Dismiss
-- Add "Issues" tab in `App.tsx`
-
-**Files to create/modify:**
-- `backend/models.py`
-- `backend/routes/batch.py`
-- `frontend/src/types.ts`
-- `frontend/src/components/BatchReview.tsx`
-- `frontend/src/api.ts`
-- `frontend/src/components/IssuesView.tsx` (create)
-- `frontend/src/App.tsx`
-- `frontend/src/App.css`
-
----
-
-### T3: Fuzzy Matching — OR Instead of AND
-
-**Goal:** Change fuzzy artist/album matching from AND to OR logic.
-
-**Details:**
-- In `backend/services/discogs.py`, function `_sanity_check()`: change return condition from `artist_sim >= threshold and album_sim >= threshold` to `artist_sim >= threshold or album_sim >= threshold`
-
-**Files to modify:**
-- `backend/services/discogs.py`
-
----
-
-### T4: Replace "Not present in label" with null
-
-**Goal:** Remove the sentinel string from LLM prompts. Use `null` for missing album/artist.
-
-**Details:**
-- Update both prompts in `backend/config.py`: albums/artists should be `array of strings or null` (null if not visible)
-- Update `backend/services/search.py`: change sentinel string detection to null/empty check (`candidate_albums is None or len(candidate_albums) == 0`)
-- Keep self-titled logic intact
-
-**Files to modify:**
-- `backend/config.py`
-- `backend/services/search.py`
-
----
-
-### T5: Collection Page
-
-**Goal:** Fetch user's Discogs collection and display it with images, search, and sorting (default: genre → artist → year).
-
-**Details:**
-- Backend: add `get_collection(page, per_page, sort, sort_order)` to `backend/services/discogs.py`; add `GET /api/collection` endpoint
-- Reference existing pattern in `scripts/discogs_collection_wipe.py` for Discogs collection API usage
-- Frontend: new `CollectionView.tsx` — grid of items with cover images, search bar, sort controls, pagination
-- Add "Collection" tab in `App.tsx`
-
-**Files to create/modify:**
-- `backend/services/discogs.py`
-- `backend/routes/collection.py` (create)
-- `backend/main.py` (register new router)
-- `frontend/src/api.ts`
-- `frontend/src/components/CollectionView.tsx` (create)
-- `frontend/src/types.ts`
-- `frontend/src/App.tsx`
-- `frontend/src/App.css`
-
----
+_(empty)_
 
 ---
 
@@ -136,4 +65,75 @@ _(empty)_
 
 ## Finished
 
-_(empty)_
+### T3: Fuzzy Matching — OR Instead of AND
+
+**Goal:** Change fuzzy artist/album matching from AND to OR logic.
+
+**Details:**
+- In `backend/services/discogs.py`, function `_sanity_check()`: change return condition from `artist_sim >= threshold and album_sim >= threshold` to `artist_sim >= threshold or album_sim >= threshold`
+
+**Files modified:**
+- `backend/services/discogs.py`
+- `backend/tests/test_discogs_service.py`
+
+---
+
+### T4: Replace "Not present in label" with null
+
+**Goal:** Remove the sentinel string from LLM prompts. Use `null` for missing album/artist.
+
+**Details:**
+- Updated both prompts in `backend/config.py`: albums/artists are now `array of strings or null` (null if not visible)
+- Updated `backend/services/search.py`: sentinel string detection replaced with null/empty check
+- Self-titled logic intact
+
+**Files modified:**
+- `backend/config.py`
+- `backend/services/search.py`
+- `backend/tests/test_search_pipeline.py`
+
+---
+
+### T2: "Wrong Record" Button + Issues Tab
+
+**Goal:** Add "Wrong" action button (layout: Wrong / Dismiss / Accept). Wrong records and errored items visible in a separate "Issues" tab for retry or manual add.
+
+**Details:**
+- Backend: added `WRONG = "wrong"` to `ReviewStatus` in `backend/models.py`
+- Frontend BatchReview: action bar is now `Wrong / Dismiss / Accept+Add`; "Wrong" calls `reviewItemGlobal(itemId, 'wrong')`
+- Frontend types: added `'wrong'` to `review_status` union
+- Backend route: added `status` query param to `GET /api/review/items`
+- New `IssuesView.tsx` component: two sections — "Wrong matches" and "Errors"; actions: Retry, Dismiss
+- Added "Issues" tab in `App.tsx`
+
+**Files created/modified:**
+- `backend/models.py`
+- `backend/routes/batch.py`
+- `backend/repository/mongo.py`
+- `frontend/src/types.ts`
+- `frontend/src/components/BatchReview.tsx`
+- `frontend/src/api.ts`
+- `frontend/src/components/IssuesView.tsx` (created)
+- `frontend/src/App.tsx`
+- `frontend/src/App.css`
+
+---
+
+### T5: Collection Page
+
+**Goal:** Fetch user's Discogs collection and display it with images, search, and sorting (default: genre → artist → year).
+
+**Details:**
+- Backend: added `get_collection(page, per_page, sort, sort_order)` to `backend/services/discogs.py`; added `GET /api/collection` endpoint
+- Frontend: new `CollectionView.tsx` — grid of items with cover images, search bar, sort controls, pagination
+- Added "Collection" tab in `App.tsx`
+
+**Files created/modified:**
+- `backend/services/discogs.py`
+- `backend/routes/collection.py` (created)
+- `backend/main.py` (registered new router)
+- `frontend/src/api.ts`
+- `frontend/src/components/CollectionView.tsx` (created)
+- `frontend/src/types.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/App.css`

@@ -27,6 +27,7 @@ class ReviewStatus(StrEnum):
     UNREVIEWED = "unreviewed"
     ACCEPTED = "accepted"
     SKIPPED = "skipped"
+    WRONG = "wrong"
 
 
 class LabelData(BaseModel):
