@@ -175,12 +175,17 @@ def process_single_image(
             ordered.append(r)
             seen.add(idx)
 
-    # 5b. Tiebreaker: when two results share the same title but one has a cover image
-    # and the other doesn't, promote the one with the image.
-    for i in range(len(ordered) - 1):
-        a, b = ordered[i], ordered[i + 1]
-        if a.get("title") == b.get("title") and not a.get("cover_image") and b.get("cover_image"):
-            ordered[i], ordered[i + 1] = b, a
+    # 5b. Tiebreaker: within groups of results that share the same title,
+    # sort so entries with a cover image come first (stable sort preserves
+    # the LLM's original ordering within each subgroup).
+    i = 0
+    while i < len(ordered):
+        j = i + 1
+        while j < len(ordered) and ordered[j].get("title") == ordered[i].get("title"):
+            j += 1
+        if j - i > 1:
+            ordered[i:j] = sorted(ordered[i:j], key=lambda r: not r.get("cover_image"))
+        i = j
 
     # Safety net: if ranking discarded everything, keep results in likeliness order
     if not ordered and releases:
