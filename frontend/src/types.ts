@@ -47,7 +47,7 @@ export interface SearchResponse {
 }
 
 export interface CollectionItem {
-  id: number;
+  release_id: number;
   instance_id: number;
   title: string;
   artist: string;
@@ -65,6 +65,15 @@ export interface CollectionResponse {
   pages: number;
   per_page: number;
   total_items: number;
+}
+
+export interface SyncStatus {
+  status: 'idle' | 'syncing' | 'error';
+  started_at?: string | null;
+  completed_at?: string | null;
+  total_items?: number;
+  items_synced?: number;
+  error?: string | null;
 }
 
 export interface Batch {

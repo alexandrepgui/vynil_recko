@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from pymongo import MongoClient
+from pymongo import ASCENDING, DESCENDING, MongoClient, ReplaceOne
 from pymongo.collection import Collection
 
 from logger import get_logger
-from .models import Batch, BatchItem, CollectionRecord, LLMUsageRecord, SearchRecord
+from .models import Batch, BatchItem, CollectionItem, CollectionRecord, LLMUsageRecord, SearchRecord
 
 log = get_logger("repository.mongo")
 
@@ -22,7 +22,91 @@ class MongoRepository:
         self._batches: Collection = self._db["batches"]
         self._items: Collection = self._db["batch_items"]
         self._llm_usage: Collection = self._db["llm_usage"]
+        self._collection_items: Collection = self._db["collection_items"]
+        self._sync_status: Collection = self._db["sync_status"]
+        self._ensure_indexes()
         log.info("MongoDB repository: db=%s", database)
+
+    def _ensure_indexes(self) -> None:
+        self._collection_items.create_index("instance_id", unique=True)
+        self._collection_items.create_index([
+            ("title", "text"),
+            ("artist", "text"),
+        ], name="collection_text_search")
+
+    # ── Collection items (persisted Discogs collection) ────────────────────
+
+    def upsert_collection_items_bulk(self, items: list[CollectionItem]) -> int:
+        if not items:
+            return 0
+        ops = [
+            ReplaceOne({"instance_id": item.instance_id}, item.to_dict(), upsert=True)
+            for item in items
+        ]
+        result = self._collection_items.bulk_write(ops)
+        return result.upserted_count + result.modified_count
+
+    _SORT_FIELD_MAP = {
+        "artist": "artist",
+        "title": "title",
+        "year": "year",
+        "added": "date_added",
+        "format": "format",
+    }
+
+    def find_collection_items(
+        self,
+        query: str | None = None,
+        sort: str = "artist",
+        sort_order: str = "asc",
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[CollectionItem]:
+        filt: dict = {}
+        if query:
+            filt["$text"] = {"$search": query}
+
+        mongo_field = self._SORT_FIELD_MAP.get(sort, "artist")
+        direction = ASCENDING if sort_order == "asc" else DESCENDING
+
+        sort_spec: list[tuple[str, int]] = [(mongo_field, direction)]
+        # Secondary sort by year when primary is artist
+        if sort == "artist":
+            sort_spec.append(("year", direction))
+
+        cursor = (
+            self._collection_items.find(filt, {"_id": 0})
+            .sort(sort_spec)
+            .skip(skip)
+            .limit(limit)
+        )
+        return [CollectionItem.from_dict(doc) for doc in cursor]
+
+    def count_collection_items(self, query: str | None = None) -> int:
+        filt: dict = {}
+        if query:
+            filt["$text"] = {"$search": query}
+        return self._collection_items.count_documents(filt)
+
+    def delete_stale_items(self, synced_before: str) -> int:
+        """Delete collection items that were not updated during the latest sync."""
+        result = self._collection_items.delete_many(
+            {"synced_at": {"$lt": synced_before}}
+        )
+        return result.deleted_count
+
+    # ── Sync status ────────────────────────────────────────────────────────
+
+    def get_sync_status(self) -> dict:
+        doc = self._sync_status.find_one({"_id": "collection"}, {"_id": 0})
+        return doc or {"status": "idle"}
+
+    def update_sync_status(self, update: dict) -> None:
+        self._sync_status.update_one(
+            {"_id": "collection"},
+            {"$set": update},
+            upsert=True,
+        )
 
     # ── Search telemetry ──────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import type { AuthStatus, Batch, BatchItem, CollectionResponse, MediaType, SearchResponse } from './types';
+import type { AuthStatus, Batch, BatchItem, CollectionResponse, MediaType, SearchResponse, SyncStatus } from './types';
 
 export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', signal?: AbortSignal): Promise<SearchResponse> {
   const formData = new FormData();
@@ -133,6 +133,7 @@ export async function getCollection(
   perPage: number = 50,
   sort: string = 'artist',
   sortOrder: string = 'asc',
+  search: string = '',
 ): Promise<CollectionResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -140,11 +141,27 @@ export async function getCollection(
     sort,
     sort_order: sortOrder,
   });
+  if (search.trim()) params.set('q', search.trim());
   const resp = await fetch(`/api/collection?${params}`);
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
   }
+  return resp.json();
+}
+
+export async function triggerCollectionSync(): Promise<{ message: string }> {
+  const resp = await fetch('/api/collection/sync', { method: 'POST' });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to trigger sync (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function getCollectionSyncStatus(): Promise<SyncStatus> {
+  const resp = await fetch('/api/collection/sync');
+  if (!resp.ok) throw new Error(`Failed to fetch sync status (${resp.status})`);
   return resp.json();
 }
 

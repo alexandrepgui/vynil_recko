@@ -897,3 +897,48 @@
   font-size: 0.85rem;
   color: #666;
 }
+
+.collection-landing,
+.collection-syncing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: #555;
+}
+
+.collection-landing .btn-primary {
+  padding: 0.85rem 2rem;
+  font-size: 1.1rem;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.collection-landing .btn-primary:hover {
+  background: #256b29;
+}
+
+.sync-progress-bar {
+  width: 280px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sync-progress-fill {
+  height: 100%;
+  background: #2e7d32;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.collection-resync {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}

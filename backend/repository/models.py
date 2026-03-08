@@ -141,6 +141,41 @@ class LLMUsageRecord:
 
 
 @dataclass
+class CollectionItem:
+    """A single release in the user's Discogs collection (persisted locally)."""
+    instance_id: int = 0
+    release_id: int = 0
+    title: str = ""
+    artist: str = ""
+    year: int = 0
+    genres: list[str] = field(default_factory=list)
+    styles: list[str] = field(default_factory=list)
+    format: str = ""
+    cover_image: str | None = None
+    date_added: str | None = None
+    synced_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CollectionItem:
+        return cls(
+            instance_id=data.get("instance_id", 0),
+            release_id=data.get("release_id", 0),
+            title=data.get("title", ""),
+            artist=data.get("artist", ""),
+            year=data.get("year", 0),
+            genres=data.get("genres", []),
+            styles=data.get("styles", []),
+            format=data.get("format", ""),
+            cover_image=data.get("cover_image"),
+            date_added=data.get("date_added"),
+            synced_at=data.get("synced_at", ""),
+        )
+
+
+@dataclass
 class CollectionRecord:
     record_id: str = field(default_factory=lambda: str(uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

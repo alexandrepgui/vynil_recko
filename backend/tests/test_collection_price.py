@@ -1,4 +1,4 @@
-"""Tests for GET /api/collection, POST /api/collection, and GET /api/price/{release_id}."""
+"""Tests for GET /api/collection, POST /api/collection, GET /api/price/{release_id}, and sync endpoints."""
 
 from unittest.mock import MagicMock, patch
 
@@ -6,12 +6,16 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
+from repository.models import CollectionItem
+
 
 @pytest.fixture()
 def mock_repo():
     repo = MagicMock()
     repo.saved_records = []
     repo.save_collection_record.side_effect = lambda r: repo.saved_records.append(r)
+    # Default sync status: never synced
+    repo.get_sync_status.return_value = {"status": "idle"}
     return repo
 
 
@@ -25,40 +29,34 @@ def client(mock_repo):
     app.dependency_overrides.clear()
 
 
-# ── GET /api/collection (browse) ────────────────────────────────────────────
+# ── GET /api/collection (reads from MongoDB) ──────────────────────────────
 
-DISCOGS_COLLECTION_RESPONSE = {
-    "pagination": {"page": 1, "pages": 3, "per_page": 50, "items": 120},
-    "releases": [
-        {
-            "instance_id": 100,
-            "date_added": "2024-01-15T10:00:00-08:00",
-            "basic_information": {
-                "id": 555,
-                "title": "Kind of Blue",
-                "year": 1959,
-                "artists": [{"name": "Miles Davis"}],
-                "genres": ["Jazz"],
-                "styles": ["Modal"],
-                "formats": [{"name": "LP"}],
-                "cover_image": "https://img.discogs.com/cover.jpg",
-            },
-        },
-    ],
-}
+SAMPLE_ITEM = CollectionItem(
+    instance_id=100,
+    release_id=555,
+    title="Kind of Blue",
+    artist="Miles Davis",
+    year=1959,
+    genres=["Jazz"],
+    styles=["Modal"],
+    format="LP",
+    cover_image="https://img.discogs.com/cover.jpg",
+    date_added="2024-01-15T10:00:00-08:00",
+)
 
 
-def test_get_collection_success(client):
-    with patch("routes.collection.get_collection", return_value=DISCOGS_COLLECTION_RESPONSE):
-        resp = client.get("/api/collection")
+def test_get_collection_success(client, mock_repo):
+    mock_repo.find_collection_items.return_value = [SAMPLE_ITEM]
+    mock_repo.count_collection_items.return_value = 120
+    resp = client.get("/api/collection")
     assert resp.status_code == 200
     body = resp.json()
     assert body["page"] == 1
-    assert body["pages"] == 3
+    assert body["pages"] == 3  # ceil(120/50)
     assert body["total_items"] == 120
     assert len(body["items"]) == 1
     item = body["items"][0]
-    assert item["id"] == 555
+    assert item["release_id"] == 555
     assert item["title"] == "Kind of Blue"
     assert item["artist"] == "Miles Davis"
     assert item["year"] == 1959
@@ -67,40 +65,62 @@ def test_get_collection_success(client):
     assert item["cover_image"] == "https://img.discogs.com/cover.jpg"
 
 
-def test_get_collection_with_params(client):
-    with patch("routes.collection.get_collection", return_value=DISCOGS_COLLECTION_RESPONSE) as mock:
-        resp = client.get("/api/collection?page=2&per_page=25&sort=year&sort_order=desc")
+def test_get_collection_with_params(client, mock_repo):
+    mock_repo.find_collection_items.return_value = []
+    mock_repo.count_collection_items.return_value = 0
+    resp = client.get("/api/collection?page=2&per_page=25&sort=year&sort_order=desc")
     assert resp.status_code == 200
-    mock.assert_called_once_with(page=2, per_page=25, sort="year", sort_order="desc")
+    mock_repo.find_collection_items.assert_called_once_with(
+        query=None, sort="year", sort_order="desc", skip=25, limit=25,
+    )
 
 
-def test_get_collection_401(client):
-    http_err = requests.HTTPError(response=MagicMock(status_code=401))
-    with patch("routes.collection.get_collection", side_effect=http_err):
-        resp = client.get("/api/collection")
-    assert resp.status_code == 401
+def test_get_collection_with_search(client, mock_repo):
+    mock_repo.find_collection_items.return_value = []
+    mock_repo.count_collection_items.return_value = 0
+    resp = client.get("/api/collection?q=miles")
+    assert resp.status_code == 200
+    mock_repo.find_collection_items.assert_called_once_with(
+        query="miles", sort="artist", sort_order="asc", skip=0, limit=50,
+    )
 
 
-def test_get_collection_discogs_error(client):
-    http_err = requests.HTTPError(response=MagicMock(status_code=500))
-    with patch("routes.collection.get_collection", side_effect=http_err):
-        resp = client.get("/api/collection")
-    assert resp.status_code == 502
-
-
-def test_get_collection_unexpected_error(client):
-    with patch("routes.collection.get_collection", side_effect=RuntimeError("boom")):
-        resp = client.get("/api/collection")
-    assert resp.status_code == 502
-
-
-def test_get_collection_empty(client):
-    empty = {"pagination": {"page": 1, "pages": 1, "per_page": 50, "items": 0}, "releases": []}
-    with patch("routes.collection.get_collection", return_value=empty):
-        resp = client.get("/api/collection")
+def test_get_collection_empty(client, mock_repo):
+    mock_repo.find_collection_items.return_value = []
+    mock_repo.count_collection_items.return_value = 0
+    resp = client.get("/api/collection")
     assert resp.status_code == 200
     assert resp.json()["items"] == []
     assert resp.json()["total_items"] == 0
+
+
+# ── Sync endpoints ────────────────────────────────────────────────────────
+
+
+def test_trigger_sync(client, mock_repo):
+    mock_repo.get_sync_status.return_value = {"status": "idle"}
+    with patch("routes.collection.sync_full_collection"):
+        resp = client.post("/api/collection/sync")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Sync started."
+
+
+def test_trigger_sync_already_running(client, mock_repo):
+    mock_repo.get_sync_status.return_value = {"status": "syncing"}
+    resp = client.post("/api/collection/sync")
+    assert resp.status_code == 409
+
+
+def test_get_sync_status(client, mock_repo):
+    mock_repo.get_sync_status.return_value = {
+        "status": "idle",
+        "completed_at": "2024-01-15T10:00:00Z",
+        "total_items": 120,
+    }
+    resp = client.get("/api/collection/sync")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "idle"
+    assert resp.json()["total_items"] == 120
 
 
 # ── POST /api/collection ────────────────────────────────────────────────────
