@@ -1,6 +1,22 @@
 import os
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 from config import UPLOADS_DIR
+
+
+def create_retry_session(user_agent: str | None = None) -> requests.Session:
+    """Create a requests.Session with retry logic on 502/503/504."""
+    session = requests.Session()
+    session.mount(
+        "https://",
+        HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])),
+    )
+    if user_agent:
+        session.headers["User-Agent"] = user_agent
+    return session
 
 
 def save_upload_image(item_id: str, filename: str, image_bytes: bytes) -> str:

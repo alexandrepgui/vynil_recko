@@ -9,8 +9,12 @@ import requests
 from config import DISCOGS_BASE_URL, DISCOGS_USER_AGENT
 from logger import get_logger
 from services.discogs_auth import build_oauth_headers, get_current_tokens
+from utils import create_retry_session
 
 log = get_logger("services.discogs")
+
+# Persistent session — reuses TCP/TLS connections across all Discogs API calls
+_session = create_retry_session(user_agent=DISCOGS_USER_AGENT)
 
 # Pause when remaining requests drop to this threshold
 _RATE_LIMIT_THRESHOLD = 5
@@ -23,10 +27,7 @@ def _headers() -> dict:
     if tokens:
         return build_oauth_headers(tokens)
     token = os.getenv("DISCOGS_TOKEN")
-    return {
-        "User-Agent": DISCOGS_USER_AGENT,
-        "Authorization": f"Discogs token={token}",
-    }
+    return {"Authorization": f"Discogs token={token}"}
 
 
 def _respect_rate_limit(resp: requests.Response) -> None:
@@ -55,7 +56,7 @@ def discogs_search(max_pages: int = 10, **params) -> list[dict]:
     log.debug("discogs_search start: params=%s max_pages=%d", params, max_pages)
     while page <= max_pages:
         params["page"] = page
-        resp = requests.get(
+        resp = _session.get(
             f"{DISCOGS_BASE_URL}/database/search",
             headers=_headers(),
             params=params,
@@ -325,7 +326,7 @@ def score_by_metadata(releases: list[dict], label_meta: dict) -> list[dict]:
 
 def get_marketplace_stats(release_id: int) -> dict:
     """Fetch marketplace price stats for a release."""
-    resp = requests.get(
+    resp = _session.get(
         f"{DISCOGS_BASE_URL}/marketplace/stats/{release_id}",
         headers=_headers(),
     )
@@ -336,7 +337,7 @@ def get_marketplace_stats(release_id: int) -> dict:
 
 def get_identity() -> str:
     """Get the authenticated Discogs username via /oauth/identity."""
-    resp = requests.get(
+    resp = _session.get(
         f"{DISCOGS_BASE_URL}/oauth/identity",
         headers=_headers(),
     )
@@ -355,7 +356,7 @@ def get_collection(
     tokens = get_current_tokens()
     username = tokens.username if tokens and tokens.username else get_identity()
     log.info("Fetching collection page %d for user '%s'", page, username)
-    resp = requests.get(
+    resp = _session.get(
         f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/0/releases",
         headers=_headers(),
         params={
@@ -375,7 +376,7 @@ def add_to_collection(release_id: int) -> dict:
     tokens = get_current_tokens()
     username = tokens.username if tokens and tokens.username else get_identity()
     log.info("Adding release %d to collection for user '%s'", release_id, username)
-    resp = requests.post(
+    resp = _session.post(
         f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/1/releases/{release_id}",
         headers=_headers(),
     )

@@ -281,6 +281,8 @@
   font-size: 0.95rem;
   font-weight: 500;
   color: #888;
+  text-decoration: none;
+  text-align: center;
   transition: color 0.15s, border-color 0.15s;
 }
 

@@ -8,40 +8,7 @@
 
 ## Backlog
 
-### T8: Use Persistent HTTP Session for Discogs API
-
-**Goal:** Replace individual `requests.get()`/`requests.post()` calls to the Discogs API with a shared `requests.Session` to reuse TCP/TLS connections and avoid redundant header construction.
-
-**Details:**
-- A single search can trigger 10-20+ Discogs API calls (paginated search across multiple strategies, collection sync). Each currently opens a new TCP+TLS connection.
-- Create a module-level `requests.Session` in `backend/services/discogs.py` with shared headers (User-Agent, auth) and an `HTTPAdapter` with retry logic (similar to what OpenRouter already has).
-- Replace all `requests.get()`/`requests.post()` calls in `discogs.py` with `session.get()`/`session.post()`.
-- Handle OAuth header updates: when tokens change, update the session headers.
-- Also update `backend/services/discogs_auth.py` and `backend/services/collection_sync.py` if they make direct `requests` calls to Discogs.
-- OpenRouter already uses `requests.Session()` — no changes needed there.
-
-**Files to modify:**
-- `backend/services/discogs.py`
-- `backend/services/discogs_auth.py`
-- `backend/services/collection_sync.py`
-
----
-
-### T7: Page-based Routing (Replace Tabs)
-
-**Goal:** Replace the tab-based navigation with proper client-side routes so each section has its own URL.
-
-**Details:**
-- Install `react-router-dom` in the frontend
-- Define routes: `/` (or `/search`) → Single Search, `/batch` → Batch Upload, `/review` → Batch Review, `/issues` → Issues, `/collection` → Collection
-- Replace the tab state and conditional rendering in `App.tsx` with a `<Router>` + `<Routes>` tree
-- Replace tab buttons with `<NavLink>` components so the active route is highlighted automatically
-- Navigating directly to any route (e.g. `/collection`) must render the correct page without a full reload
-
-**Files to create/modify:**
-- `frontend/package.json` (add `react-router-dom`)
-- `frontend/src/App.tsx`
-- `frontend/src/App.css` (nav link active styles if needed)
+_(empty)_
 
 ---
 
@@ -51,7 +18,30 @@ _(empty)_
 
 ## Awaiting Validation
 
-_(empty)_
+### T8: Use Persistent HTTP Session for Discogs API
+
+**Goal:** Replace individual `requests.get()`/`requests.post()` calls to the Discogs API with a shared `requests.Session` to reuse TCP/TLS connections and avoid redundant header construction.
+
+**Files modified:**
+- `backend/services/discogs.py` — module-level `_session` with HTTPAdapter retry; all calls use `_session.get/post`; `_headers()` now returns auth-only (User-Agent moved to session)
+- `backend/services/discogs_auth.py` — `_auth_session` with same retry config; OAuth calls use `_auth_session`; `build_oauth_headers()` returns auth-only header
+- `backend/tests/test_discogs_auth.py` — updated patches and assertions
+- `backend/tests/test_auth_routes.py` — updated patches
+- `backend/tests/test_search_endpoint.py` — updated patches
+- `backend/tests/test_search_pipeline.py` — updated patches
+
+---
+
+### T7: Page-based Routing (Replace Tabs)
+
+**Goal:** Replace the tab-based navigation with proper client-side routes so each section has its own URL.
+
+**Files modified:**
+- `frontend/package.json` — added `react-router-dom ^7.0.0`
+- `frontend/src/App.tsx` — replaced tab state with `BrowserRouter` + `Routes`; tab buttons replaced with `NavLink`; single-search view extracted to `SingleSearchPage` component
+- `frontend/src/App.css` — added `text-decoration: none; text-align: center` to `.mode-tab` for anchor rendering
+
+---
 
 ---
 

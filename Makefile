@@ -8,12 +8,12 @@ install:
 	$(NVM) cd frontend && npm install
 
 mongo:
-	@if docker ps --format '{{.Names}}' | grep -q '^vinyl-recko-mongo$$'; then \
+	@if docker ps --format '{{.Names}}' | grep -q '^groove-log-mongo$$'; then \
 		echo "MongoDB already running"; \
 	else \
 		echo "Starting MongoDB..."; \
-		docker start vinyl-recko-mongo 2>/dev/null || \
-		docker run -d --name vinyl-recko-mongo -p 27017:27017 -v vinyl_recko_mongo_data:/data/db mongo:7 > /dev/null; \
+		docker start groove-log-mongo 2>/dev/null || \
+		docker run -d --name groove-log-mongo -p 27017:27017 -v groove_log_mongo_data:/data/db mongo:7 > /dev/null; \
 	fi
 
 backend:
@@ -45,5 +45,5 @@ full-test:
 stop:
 	@lsof -ti:8000 | xargs kill 2>/dev/null; true
 	@lsof -ti:5173 | xargs kill 2>/dev/null; true
-	@docker stop vinyl-recko-mongo 2>/dev/null; true
+	@docker stop groove-log-mongo 2>/dev/null; true
 	@echo "Stopped"

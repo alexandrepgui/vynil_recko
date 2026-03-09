@@ -34,7 +34,7 @@ def _run_pipeline(label_data, discogs_results=None, ranking=None):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
         patch("services.search.get_repo", return_value=mock_repo),
@@ -265,7 +265,7 @@ class TestNoResults:
 
         with (
             patch("services.vision._get_client", return_value=mock_client),
-            patch("services.discogs.requests.get", return_value=discogs_resp),
+            patch("services.discogs._session.get", return_value=discogs_resp),
             patch("services.vision._read_cache", return_value=None),
             patch("services.vision._write_cache"),
             patch("services.search.get_repo", return_value=mock_repo),
