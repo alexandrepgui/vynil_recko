@@ -1,4 +1,4 @@
-# Vinyl Recko
+# Groove Log
 
 Identify vinyl records by photographing their labels. Upload an image, and the app uses vision AI to extract metadata (artist, album, catalog number, etc.), then searches the [Discogs](https://www.discogs.com/) database to find matching releases. Results are ranked by relevance and can be added directly to your Discogs collection.
 

@@ -67,7 +67,7 @@ class TestLogin:
         resp = client.get("/api/auth/login")
         assert resp.status_code == 503
 
-    @patch("services.discogs_auth.requests.get")
+    @patch("services.discogs_auth._auth_session.get")
     def test_returns_authorize_url(self, mock_get, monkeypatch):
         monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
         monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")
@@ -81,8 +81,8 @@ class TestLogin:
 
 
 class TestCallback:
-    @patch("services.discogs_auth.requests.post")
-    @patch("services.discogs.requests.get")
+    @patch("services.discogs_auth._auth_session.post")
+    @patch("services.discogs._session.get")
     def test_successful_callback(self, mock_identity, mock_post, monkeypatch):
         monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
         monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")

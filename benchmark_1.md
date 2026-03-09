@@ -1,4 +1,4 @@
-# Benchmark 1 — Vinyl Recko Batch Processing
+# Benchmark 1 — Groove Log Batch Processing
 
 **Date:** 2026-03-03  
 **Model:** google/gemini-2.5-flash (via OpenRouter)  

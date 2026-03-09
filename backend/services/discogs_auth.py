@@ -18,8 +18,12 @@ import requests
 
 from config import DISCOGS_BASE_URL, DISCOGS_USER_AGENT
 from logger import get_logger
+from utils import create_retry_session
 
 log = get_logger("services.discogs_auth")
+
+# Persistent session for OAuth token exchange calls
+_auth_session = create_retry_session(user_agent=DISCOGS_USER_AGENT)
 
 REQUEST_TOKEN_URL = f"{DISCOGS_BASE_URL}/oauth/request_token"
 AUTHORIZE_URL = "https://www.discogs.com/oauth/authorize"
@@ -130,10 +134,9 @@ def get_request_token(callback_url: str) -> tuple[str, str]:
 
     auth_params = _build_auth_params(oauth_callback=callback_url)
 
-    resp = requests.get(
+    resp = _auth_session.get(
         REQUEST_TOKEN_URL,
         headers={
-            "User-Agent": DISCOGS_USER_AGENT,
             "Content-Type": "application/x-www-form-urlencoded",
             "Authorization": _oauth_header(auth_params),
         },
@@ -176,10 +179,9 @@ def exchange_verifier(oauth_token: str, oauth_verifier: str) -> OAuthTokens:
         oauth_verifier=oauth_verifier,
     )
 
-    resp = requests.post(
+    resp = _auth_session.post(
         ACCESS_TOKEN_URL,
         headers={
-            "User-Agent": DISCOGS_USER_AGENT,
             "Content-Type": "application/x-www-form-urlencoded",
             "Authorization": _oauth_header(auth_params),
         },
@@ -198,12 +200,9 @@ def exchange_verifier(oauth_token: str, oauth_verifier: str) -> OAuthTokens:
 
 
 def build_oauth_headers(tokens: OAuthTokens) -> dict:
-    """Build request headers for an authenticated API call using OAuth tokens."""
+    """Build the Authorization header for an authenticated Discogs API call."""
     auth_params = _build_auth_params(
         token_secret=tokens.access_token_secret,
         oauth_token=tokens.access_token,
     )
-    return {
-        "User-Agent": DISCOGS_USER_AGENT,
-        "Authorization": _oauth_header(auth_params),
-    }
+    return {"Authorization": _oauth_header(auth_params)}

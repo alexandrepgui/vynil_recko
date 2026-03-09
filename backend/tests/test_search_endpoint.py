@@ -2,7 +2,7 @@
 
 Every test mocks:
   - LLM API via services.vision._get_client (provider abstraction layer)
-  - Discogs API via services.discogs.requests.get
+  - Discogs API via services.discogs._session.get
   - MongoDB repository via FastAPI dependency override
 
 We verify both the HTTP response AND the SearchRecord saved to the repository.
@@ -57,7 +57,7 @@ def test_success_full_pipeline(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):
@@ -142,7 +142,7 @@ def test_vision_returns_empty_albums_triggers_self_titled(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):
@@ -184,7 +184,7 @@ def test_discogs_api_error(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", side_effect=mock_discogs_fail),
+        patch("services.discogs._session.get", side_effect=mock_discogs_fail),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):
@@ -226,7 +226,7 @@ def test_ranking_api_error(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):
@@ -250,7 +250,7 @@ def test_repo_save_failure_still_returns_response(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):
@@ -271,7 +271,7 @@ def test_no_discogs_results(client, mock_repo):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=empty_discogs),
+        patch("services.discogs._session.get", return_value=empty_discogs),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
     ):

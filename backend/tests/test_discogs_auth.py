@@ -58,7 +58,7 @@ class TestPlaintextSignature:
 
 
 class TestGetRequestToken:
-    @patch("services.discogs_auth.requests.get")
+    @patch("services.discogs_auth._auth_session.get")
     def test_success(self, mock_get, _env):
         mock_resp = MagicMock()
         mock_resp.text = "oauth_token=req_tok&oauth_token_secret=req_sec&oauth_callback_confirmed=true"
@@ -72,7 +72,7 @@ class TestGetRequestToken:
         assert "req_tok" in _pending
         assert _pending["req_tok"].request_token_secret == "req_sec"
 
-    @patch("services.discogs_auth.requests.get")
+    @patch("services.discogs_auth._auth_session.get")
     def test_propagates_http_error(self, mock_get, _env):
         mock_get.return_value.raise_for_status.side_effect = Exception("401")
         with pytest.raises(Exception, match="401"):
@@ -80,7 +80,7 @@ class TestGetRequestToken:
 
 
 class TestExchangeVerifier:
-    @patch("services.discogs_auth.requests.post")
+    @patch("services.discogs_auth._auth_session.post")
     def test_success(self, mock_post, _env):
         # Seed pending state
         _pending["req_tok"] = PendingOAuth(
@@ -110,7 +110,6 @@ class TestBuildOAuthHeaders:
         headers = build_oauth_headers(tokens)
 
         assert "Authorization" in headers
-        assert "User-Agent" in headers
         assert "OAuth" in headers["Authorization"]
         assert "at" in headers["Authorization"]
 
