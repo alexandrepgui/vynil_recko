@@ -2,11 +2,18 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from services.llm.base import LLMResponse
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _mock_lifespan_repo():
+    """Prevent the app lifespan from connecting to a real MongoDB."""
+    with patch("main.get_repo", return_value=MagicMock()):
+        yield
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
