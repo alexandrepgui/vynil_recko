@@ -17,7 +17,8 @@
       "Bash(gsettings list-recursively:*)",
       "Bash(setxkbmap:*)",
       "Bash(xinput list:*)",
-      "Bash(gsettings set:*)"
+      "Bash(gsettings set:*)",
+      "WebSearch"
     ]
   }
 }
