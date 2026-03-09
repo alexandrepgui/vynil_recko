@@ -103,6 +103,13 @@ def get_current_tokens() -> OAuthTokens | None:
     return _current_tokens
 
 
+def set_tokens(tokens: OAuthTokens) -> None:
+    """Restore OAuth tokens (e.g. from database on startup)."""
+    global _current_tokens
+    _current_tokens = tokens
+    log.info("OAuth tokens restored for user=%s", tokens.username)
+
+
 def clear_tokens() -> None:
     """Clear stored OAuth tokens (logout)."""
     global _current_tokens

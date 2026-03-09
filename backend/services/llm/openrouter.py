@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from logger import get_logger
 from .base import LLMProvider, LLMResponse
@@ -16,6 +18,9 @@ class OpenRouterProvider:
     def __init__(self, api_key: str, base_url: str) -> None:
         self._api_key = api_key
         self._base_url = base_url
+        self._session = requests.Session()
+        retry = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
+        self._session.mount("https://", HTTPAdapter(max_retries=retry))
 
     def chat(self, messages: list[dict], model: str) -> LLMResponse:
         headers = {
@@ -24,7 +29,7 @@ class OpenRouterProvider:
         }
 
         log.debug("OpenRouter request: model=%s messages=%d", model, len(messages))
-        resp = requests.post(
+        resp = self._session.post(
             self._base_url,
             headers=headers,
             json={"model": model, "messages": messages},

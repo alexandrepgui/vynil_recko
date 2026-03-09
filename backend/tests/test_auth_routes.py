@@ -1,11 +1,15 @@
 """Tests for the Discogs OAuth routes."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from deps import get_repo
 from main import app
+
+mock_repo = MagicMock()
+app.dependency_overrides[get_repo] = lambda: mock_repo
 
 client = TestClient(app)
 
@@ -16,6 +20,7 @@ def _clean_state():
 
     mod._current_tokens = None
     mod._pending.clear()
+    mock_repo.reset_mock()
     yield
     mod._current_tokens = None
     mod._pending.clear()
@@ -99,6 +104,7 @@ class TestCallback:
         resp = client.get("/api/auth/callback", params={"oauth_token": "tok", "oauth_verifier": "ver"}, follow_redirects=False)
         assert resp.status_code == 307
         assert "localhost:5173" in resp.headers["location"]
+        mock_repo.save_oauth_tokens.assert_called_once_with("access", "access_sec", "dj_vinyl")
 
     def test_invalid_token_returns_400(self):
         resp = client.get("/api/auth/callback", params={"oauth_token": "bad", "oauth_verifier": "v"})
@@ -117,3 +123,4 @@ class TestLogout:
         resp = client.post("/api/auth/logout")
         assert resp.status_code == 200
         assert mod._current_tokens is None
+        mock_repo.delete_oauth_tokens.assert_called_once()

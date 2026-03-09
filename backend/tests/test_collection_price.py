@@ -163,11 +163,11 @@ def test_add_to_collection_unexpected_error(client, mock_repo):
 
 
 def test_get_price_success(client):
-    stats = {"lowest_price": {"value": 12.50}, "num_for_sale": 5}
+    stats = {"lowest_price": {"value": 12.50, "currency": "USD"}, "num_for_sale": 5}
     with patch("routes.search.get_marketplace_stats", return_value=stats):
         resp = client.get("/api/price/123")
     assert resp.status_code == 200
-    assert resp.json() == {"lowest_price": 12.50, "num_for_sale": 5}
+    assert resp.json() == {"lowest_price": 12.50, "num_for_sale": 5, "currency": "USD"}
 
 
 def test_get_price_scalar_lowest(client):
@@ -176,6 +176,7 @@ def test_get_price_scalar_lowest(client):
         resp = client.get("/api/price/456")
     assert resp.status_code == 200
     assert resp.json()["lowest_price"] == 9.99
+    assert resp.json()["currency"] is None
 
 
 def test_get_price_not_found(client):

@@ -51,11 +51,13 @@ class TestOpenRouterProvider:
         }
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("services.llm.openrouter.requests.post", return_value=mock_resp) as mock_post:
-            result = provider.chat(
-                [{"role": "user", "content": "test"}],
-                model="google/gemini-2.5-flash",
-            )
+        provider._session = MagicMock()
+        provider._session.post.return_value = mock_resp
+
+        result = provider.chat(
+            [{"role": "user", "content": "test"}],
+            model="google/gemini-2.5-flash",
+        )
 
         assert isinstance(result, LLMResponse)
         assert result.content == '{"key": "value"}'
@@ -66,8 +68,8 @@ class TestOpenRouterProvider:
         assert result.provider == "openrouter"
 
         # Verify the request was made correctly
-        mock_post.assert_called_once()
-        call_kwargs = mock_post.call_args
+        provider._session.post.assert_called_once()
+        call_kwargs = provider._session.post.call_args
         assert call_kwargs[1]["json"]["model"] == "google/gemini-2.5-flash"
 
     def test_chat_handles_missing_usage(self):
@@ -80,8 +82,9 @@ class TestOpenRouterProvider:
         }
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("services.llm.openrouter.requests.post", return_value=mock_resp):
-            result = provider.chat([{"role": "user", "content": "test"}], model="test-model")
+        provider._session = MagicMock()
+        provider._session.post.return_value = mock_resp
+        result = provider.chat([{"role": "user", "content": "test"}], model="test-model")
 
         assert result.prompt_tokens == 0
         assert result.completion_tokens == 0

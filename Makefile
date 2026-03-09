@@ -17,7 +17,7 @@ mongo:
 	fi
 
 backend:
-	cd backend && python3 -m uvicorn main:app --reload --port 8000
+	cd backend && DEV_MODE=true python3 -m uvicorn main:app --reload --port 8000
 
 frontend:
 	$(NVM) cd frontend && npm run dev

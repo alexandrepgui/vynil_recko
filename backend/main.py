@@ -1,4 +1,6 @@
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -7,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import UPLOADS_DIR
+from deps import get_repo
 from logger import get_logger, setup_logging
 from routes.auth import router as auth_router
 from routes.search import router as search_router
@@ -19,7 +22,29 @@ setup_logging()
 
 log = get_logger("main")
 
-app = FastAPI(title="Vinyl Recko")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Restore persisted OAuth tokens on startup."""
+    from services.discogs_auth import OAuthTokens, set_tokens
+
+    try:
+        saved = get_repo().load_oauth_tokens()
+    except Exception as e:
+        log.warning("Could not load OAuth tokens from DB: %s", e)
+        saved = None
+    if saved:
+        set_tokens(OAuthTokens(
+            access_token=saved["access_token"],
+            access_token_secret=saved["access_token_secret"],
+            username=saved.get("username"),
+        ))
+    else:
+        log.info("No persisted OAuth tokens found")
+    yield
+
+
+app = FastAPI(title="Vinyl Recko", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

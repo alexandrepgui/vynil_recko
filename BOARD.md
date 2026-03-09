@@ -8,7 +8,21 @@
 
 ## Backlog
 
-_(empty)_
+### T7: Page-based Routing (Replace Tabs)
+
+**Goal:** Replace the tab-based navigation with proper client-side routes so each section has its own URL.
+
+**Details:**
+- Install `react-router-dom` in the frontend
+- Define routes: `/` (or `/search`) → Single Search, `/batch` → Batch Upload, `/review` → Batch Review, `/issues` → Issues, `/collection` → Collection
+- Replace the tab state and conditional rendering in `App.tsx` with a `<Router>` + `<Routes>` tree
+- Replace tab buttons with `<NavLink>` components so the active route is highlighted automatically
+- Navigating directly to any route (e.g. `/collection`) must render the correct page without a full reload
+
+**Files to create/modify:**
+- `frontend/package.json` (add `react-router-dom`)
+- `frontend/src/App.tsx`
+- `frontend/src/App.css` (nav link active styles if needed)
 
 ---
 
@@ -17,6 +31,12 @@ _(empty)_
 _(empty)_
 
 ## Awaiting Validation
+
+_(empty)_
+
+---
+
+## Finished
 
 ### T6: LLM Cost Tracking & Provider Abstraction
 
@@ -40,7 +60,7 @@ _(empty)_
 - `backend/routes/usage.py` (create)
 - `backend/main.py` (register new router)
 
----
+## Finished
 
 ### T1: Test Pipeline & CI/CD
 
@@ -55,7 +75,7 @@ _(empty)_
 - Makefile: add `test-coverage`, `test-mutation`, `full-test` (runs entire pipeline) targets
 - After completion, update this BOARD.md Rules section to enforce `make full-test` for all future tickets
 
-**Files to create/modify:**
+**Files created/modified:**
 - `.github/workflows/ci.yml` (create)
 - `backend/tests/conftest.py` (create)
 - `backend/requirements.txt`
@@ -63,7 +83,33 @@ _(empty)_
 - `Makefile`
 - `backend/tests/` (new/improved test files)
 
-## Finished
+---
+
+### T6: LLM Cost Tracking & Provider Abstraction
+
+**Goal:** Implement LLM usage monitoring, cost tracking, and a provider-agnostic abstraction layer supporting OpenRouter and Google AI (Gemini), configurable via environment variable.
+
+**Details:**
+- Research OpenRouter token usage metrics from API response (`usage` field: prompt/completion/total tokens, cost) in `backend/services/vision.py`
+- Research Google AI (Gemini) direct API pricing vs OpenRouter; document cost comparison to determine if direct access is cheaper
+- Refactor `vision.py` and `config.py` into a provider abstraction layer: supports OpenRouter and Google AI, unified interface for chat completions with vision, configurable via `LLM_PROVIDER=openrouter|google` env var
+- Capture token usage after each LLM call (label reading and ranking) for both providers
+- Persist per-request records in a new MongoDB `llm_usage` collection: `timestamp`, `provider`, `model`, `operation`, `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`, `batch_id`/`item_id`, `cache_hit`
+- Cache hits must not generate cost entries
+- Add `GET /api/usage` endpoint returning aggregated stats (total cost, cost per day, cost per model, average tokens per request)
+- Fixed `batch_id`/`item_id` not being forwarded to `process_single_image` in batch routes
+
+**Files created/modified:**
+- `backend/config.py`
+- `backend/services/vision.py`
+- `backend/services/search.py`
+- `backend/repository/mongo.py`
+- `backend/repository/models.py`
+- `backend/routes/usage.py` (created)
+- `backend/routes/batch.py`
+- `backend/main.py`
+
+---
 
 ### T3: Fuzzy Matching — OR Instead of AND
 
