@@ -8,6 +8,25 @@
 
 ## Backlog
 
+### T8: Use Persistent HTTP Session for Discogs API
+
+**Goal:** Replace individual `requests.get()`/`requests.post()` calls to the Discogs API with a shared `requests.Session` to reuse TCP/TLS connections and avoid redundant header construction.
+
+**Details:**
+- A single search can trigger 10-20+ Discogs API calls (paginated search across multiple strategies, collection sync). Each currently opens a new TCP+TLS connection.
+- Create a module-level `requests.Session` in `backend/services/discogs.py` with shared headers (User-Agent, auth) and an `HTTPAdapter` with retry logic (similar to what OpenRouter already has).
+- Replace all `requests.get()`/`requests.post()` calls in `discogs.py` with `session.get()`/`session.post()`.
+- Handle OAuth header updates: when tokens change, update the session headers.
+- Also update `backend/services/discogs_auth.py` and `backend/services/collection_sync.py` if they make direct `requests` calls to Discogs.
+- OpenRouter already uses `requests.Session()` — no changes needed there.
+
+**Files to modify:**
+- `backend/services/discogs.py`
+- `backend/services/discogs_auth.py`
+- `backend/services/collection_sync.py`
+
+---
+
 ### T7: Page-based Routing (Replace Tabs)
 
 **Goal:** Replace the tab-based navigation with proper client-side routes so each section has its own URL.
