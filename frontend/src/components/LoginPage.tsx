@@ -45,7 +45,7 @@ export default function LoginPage() {
     return (
       <div className="login-page">
         <div className="login-card">
-          <h1>Groove Log</h1>
+          <h1>groove log</h1>
           <p className="login-success">Check your email to confirm your account, then log in.</p>
           <button className="btn btn-primary" onClick={() => { setSignupSuccess(false); setMode('login'); }}>
             Back to Login
@@ -58,7 +58,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Groove Log</h1>
+        <h1>groove log</h1>
         <p className="login-subtitle">Identify your vinyl and CDs from label photos</p>
 
         <form onSubmit={handleSubmit} className="login-form">

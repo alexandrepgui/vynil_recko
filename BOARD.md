@@ -8,6 +8,108 @@
 
 ## Backlog
 
+### T11: Full-Width Responsive Layout
+
+**Goal:** Remove the fixed `max-width: 860px` container so all pages use the full viewport width and adapt to any screen size.
+
+**Details:**
+- Remove or replace `max-width: 860px` on `.app` in `App.css`; use generous horizontal padding instead (e.g. `padding: 2rem clamp(1rem, 3vw, 4rem)`)
+- Ensure the nav bar, header, and all page content stretch to fill the available width
+- Verify all existing pages (Single Search, Batch, Review, Issues, Collection, Profile) look correct at various widths (mobile, tablet, desktop, ultrawide)
+- Profile page already has its own `max-width: 480px` — keep that as-is
+- Search/Batch/Review pages with centered content may benefit from a narrower readable max-width on their own (optional, use judgement)
+
+**Files to modify:**
+- `frontend/src/App.css` — `.app` container styles
+- Possibly `frontend/src/App.tsx` if structural changes are needed
+
+---
+
+### T12: Adaptive Collection Grid with Custom Page Size
+
+**Depends on:** T11
+
+**Goal:** Let users choose how many records per page (up to 250) and make the grid dynamically adapt columns-per-row so the last row is always full (or as close as possible).
+
+**Details:**
+- **Custom page size:** Add a page-size selector to the collection controls (e.g. dropdown: 25, 50, 100, 150, 200, 250). Persist choice in localStorage. Default remains 50.
+- **Backend:** Increase `per_page` max from 100 to 250 in `GET /api/collection` query validation
+- **Adaptive columns:** Instead of pure CSS `auto-fill`, use JS to compute the optimal number of columns:
+  1. Measure available container width
+  2. Given a preferred card width (~160–200px), compute max columns that fit
+  3. From that max, pick the largest divisor of the current item count (or total visible items) so the last row is complete. If no perfect divisor exists, pick the column count that minimizes empty cells in the last row.
+  4. Apply via inline `grid-template-columns: repeat(N, 1fr)` or a CSS variable
+  5. Recalculate on window resize (debounced)
+- Update `PAGE_SIZE` constant to read from state; wire the selector to `fetchCollection()`
+
+**Files to modify:**
+- `frontend/src/components/CollectionView.tsx` — page-size selector, adaptive grid logic
+- `frontend/src/App.css` — adjust `.collection-grid` styles
+- `frontend/src/api.ts` — no changes needed (already accepts `perPage` param)
+- `backend/routes/collection.py` — raise `per_page` max to 250
+
+---
+
+### T13: Multi-Select & Batch Delete from Collection
+
+**Depends on:** T12
+
+**Goal:** Allow users to select multiple records and delete them from both the local collection and Discogs, with a confirmation dialog.
+
+**Details:**
+- **Selection UI:** Add a checkbox overlay on each collection card (visible on hover or when selection mode is active). Add a toolbar that appears when ≥1 item is selected showing: selected count, "Select All (page)", "Deselect All", "Delete Selected" button.
+- **Confirmation dialog:** When "Delete Selected" is clicked, show a modal warning: "You are about to remove N record(s) from your collection. This will also delete them from your Discogs account. This action cannot be undone." with "Cancel" and "Delete" buttons.
+- **Backend:** Add `DELETE /api/collection` endpoint accepting `{ instance_ids: number[] }`. For each instance_id:
+  1. Call Discogs API to remove the release from the user's collection (`DELETE /users/{username}/collection/folders/0/releases/{release_id}/instances/{instance_id}`)
+  2. Remove the record from MongoDB
+  3. Return summary: `{ deleted: number, errors: { instance_id: number, error: string }[] }`
+- **Frontend:** On successful delete, remove items from local state and refresh pagination counts. Show toast/message with result.
+
+**Files to create/modify:**
+- `frontend/src/components/CollectionView.tsx` — selection state, toolbar, delete handler
+- `frontend/src/App.css` — selection checkbox, toolbar, modal styles
+- `frontend/src/api.ts` — add `deleteCollectionItems(instanceIds: number[])` function
+- `backend/routes/collection.py` — add DELETE endpoint
+- `backend/services/discogs.py` — add `remove_from_collection(instance_id, release_id, tokens)` function
+- `backend/repository/mongo.py` — add `delete_collection_items(user_id, instance_ids)` method
+
+---
+
+### T14: Public Collection Page
+
+**Depends on:** T13
+
+**Goal:** Let users make their collection publicly viewable at `/collection/:username`. Add a privacy toggle in the profile page.
+
+**Details:**
+- **Privacy setting:** Add a "Collection visibility" toggle to ProfilePage (Public / Private, default Private). Store in Supabase user metadata (`collection_public: boolean`) or a new `user_settings` MongoDB collection.
+- **Backend:**
+  - Add `GET /api/collection/{username}` public endpoint (no auth required). Returns the same collection response but:
+    - Looks up the user by Discogs username (or app display name)
+    - Returns 404 if user not found or collection is private
+    - Does not expose delete or sync endpoints
+  - Add `PUT /api/me/settings` endpoint to update visibility preference
+  - Add `GET /api/me/settings` to retrieve current settings
+- **Frontend:**
+  - New route `/collection/:username` rendering a read-only version of CollectionView (no sync button, no delete, no selection checkboxes)
+  - Show the owner's display name / avatar at the top
+  - The existing `/collection` route (authenticated) keeps full controls
+  - ProfilePage: add toggle switch in a "Collection" section with explanatory text: "When public, anyone can view your collection at /collection/your-username"
+- **Sharing:** When public, show a "Copy link" button on the authenticated collection page so the user can easily share their URL
+
+**Files to create/modify:**
+- `frontend/src/components/CollectionView.tsx` — add `readOnly` prop to hide controls; support loading by username
+- `frontend/src/components/ProfilePage.tsx` — add visibility toggle
+- `frontend/src/App.tsx` — add `/collection/:username` route
+- `frontend/src/App.css` — styles for public collection header, toggle switch
+- `frontend/src/api.ts` — add `getPublicCollection(username, ...)`, `getSettings()`, `updateSettings()`
+- `frontend/src/types.ts` — add `UserSettings` interface
+- `backend/routes/collection.py` — add public GET endpoint
+- `backend/routes/profile.py` — add settings endpoints
+- `backend/repository/mongo.py` — add user settings storage/retrieval (if using MongoDB)
+
+---
+
 ### T9: Configure Supabase Cloud & Google OAuth (Manual)
 
 **Goal:** Set up production-ready Supabase project with Google sign-in provider. This is a manual task — no code changes needed.
