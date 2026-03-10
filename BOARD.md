@@ -8,7 +8,52 @@
 
 ## Backlog
 
-_(empty)_
+### T10: User Profile Page with Avatar
+
+**Goal:** Add a user profile page accessible from a profile picture / avatar in the top-right corner of the app. Clicking the avatar opens the user page with account details and settings.
+
+**Details:**
+- Display the user's profile picture (from Google OAuth / Supabase auth) as a circular avatar in the top-right corner of the navigation bar
+- If no profile picture is available, show a fallback with the user's initials
+- Clicking the avatar navigates to a `/profile` page (using existing React Router setup from T7)
+- Profile page shows: profile picture (large), display name, email, and a sign-out button
+- Discogs connection section: if connected, show Discogs username and a "Disconnect Discogs" button that revokes the OAuth token and clears stored credentials; if not connected, show a "Connect Discogs" button that initiates the existing OAuth flow
+- Support uploading a custom profile picture (store in Supabase Storage)
+- Backend: add `GET /api/me` endpoint returning the authenticated user's profile info
+- Frontend: new `ProfilePage.tsx` component; avatar button in the app header
+
+**Files to create/modify:**
+- `backend/routes/profile.py` (create — `/api/me` endpoint, `DELETE /api/me/discogs` to revoke token)
+- `backend/main.py` (register new router)
+- `frontend/src/components/ProfilePage.tsx` (create)
+- `frontend/src/components/AvatarButton.tsx` (create — top-right avatar with navigation)
+- `frontend/src/App.tsx` (add avatar to header, add `/profile` route)
+- `frontend/src/App.css` (avatar and profile page styles)
+- `frontend/src/api.ts` (add profile API calls)
+
+---
+
+### T9: Configure Supabase Cloud & Google OAuth (Manual)
+
+**Goal:** Set up production-ready Supabase project with Google sign-in provider. This is a manual task — no code changes needed.
+
+**Steps:**
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Copy the **Project URL**, **anon key**, and **JWT secret** (Settings → API → JWT Settings)
+3. Enable Google provider in Authentication → Providers → Google:
+   - Create a Google OAuth app in [Google Cloud Console](https://console.cloud.google.com) (APIs & Services → Credentials → OAuth 2.0 Client ID, type "Web application")
+   - Set authorized redirect URI to `https://<your-project>.supabase.co/auth/v1/callback`
+   - Paste the Google Client ID and Client Secret into the Supabase Google provider settings
+4. Set Site URL in Authentication → URL Configuration to your frontend URL (e.g. `http://localhost:5173` for dev). Add it to Redirect URLs too.
+5. Update `.env` with production values:
+   ```
+   SUPABASE_JWT_SECRET=<your-jwt-secret>
+   VITE_SUPABASE_URL=https://<your-project>.supabase.co
+   VITE_SUPABASE_ANON_KEY=<your-anon-key>
+   ```
+6. Test: sign up via the login page → verify email → log in → confirm API calls work
+
+**Note:** Local dev already works with `make dev` (uses Supabase CLI). This ticket is for production/cloud setup only.
 
 ---
 
