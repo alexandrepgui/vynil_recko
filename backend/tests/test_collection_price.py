@@ -6,6 +6,8 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 
+from auth import User, get_current_user
+from conftest import TEST_USER_ID
 from repository.models import CollectionItem
 
 
@@ -16,22 +18,24 @@ def mock_repo():
     repo.save_collection_record.side_effect = lambda r: repo.saved_records.append(r)
     # Default sync status: never synced
     repo.get_sync_status.return_value = {"status": "idle"}
+    repo.load_oauth_tokens.return_value = None
     return repo
 
 
 @pytest.fixture()
-def client(mock_repo):
+def client(mock_repo, mock_jwt_user):
     from deps import get_repo
     from main import app
 
     app.dependency_overrides[get_repo] = lambda: mock_repo
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_repo, None)
 
 
 # ── GET /api/collection (reads from MongoDB) ──────────────────────────────
 
 SAMPLE_ITEM = CollectionItem(
+    user_id=TEST_USER_ID,
     instance_id=100,
     release_id=555,
     title="Kind of Blue",
@@ -71,7 +75,7 @@ def test_get_collection_with_params(client, mock_repo):
     resp = client.get("/api/collection?page=2&per_page=25&sort=year&sort_order=desc")
     assert resp.status_code == 200
     mock_repo.find_collection_items.assert_called_once_with(
-        query=None, sort="year", sort_order="desc", skip=25, limit=25,
+        TEST_USER_ID, query=None, sort="year", sort_order="desc", skip=25, limit=25,
     )
 
 
@@ -81,7 +85,7 @@ def test_get_collection_with_search(client, mock_repo):
     resp = client.get("/api/collection?q=miles")
     assert resp.status_code == 200
     mock_repo.find_collection_items.assert_called_once_with(
-        query="miles", sort="artist", sort_order="asc", skip=0, limit=50,
+        TEST_USER_ID, query="miles", sort="artist", sort_order="asc", skip=0, limit=50,
     )
 
 
@@ -97,8 +101,20 @@ def test_get_collection_empty(client, mock_repo):
 # ── Sync endpoints ────────────────────────────────────────────────────────
 
 
+def test_trigger_sync_no_discogs(client, mock_repo):
+    """Cannot sync without Discogs OAuth tokens."""
+    mock_repo.get_sync_status.return_value = {"status": "idle"}
+    mock_repo.load_oauth_tokens.return_value = None
+    resp = client.post("/api/collection/sync")
+    assert resp.status_code == 400
+    assert "not connected" in resp.json()["detail"].lower()
+
+
 def test_trigger_sync(client, mock_repo):
     mock_repo.get_sync_status.return_value = {"status": "idle"}
+    mock_repo.load_oauth_tokens.return_value = {
+        "access_token": "a", "access_token_secret": "b", "username": "u",
+    }
     with patch("routes.collection.sync_full_collection"):
         resp = client.post("/api/collection/sync")
     assert resp.status_code == 200

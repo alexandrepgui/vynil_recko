@@ -1,6 +1,6 @@
 export type MediaType = 'vinyl' | 'cd';
 
-export interface AuthStatus {
+export interface DiscogsStatus {
   oauth_configured: boolean;
   authenticated: boolean;
   username: string | null;

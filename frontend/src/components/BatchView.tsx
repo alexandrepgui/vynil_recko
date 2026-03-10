@@ -3,19 +3,32 @@ import { getBatch } from '../api';
 import type { Batch, MediaType } from '../types';
 import BatchUpload from './BatchUpload';
 import BatchProgress from './BatchProgress';
+import MediaTypeSelector from './MediaTypeSelector';
+import vinylIcon from '../assets/vinyl.svg';
+import cdIcon from '../assets/cd.svg';
 
-type Phase = 'upload' | 'processing' | 'done';
+type Phase = 'select' | 'upload' | 'processing' | 'done';
 
 interface Props {
   onGoToReview?: () => void;
-  mediaType?: MediaType;
 }
 
-export default function BatchView({ onGoToReview, mediaType = 'vinyl' }: Props) {
-  const [phase, setPhase] = useState<Phase>('upload');
+export default function BatchView({ onGoToReview }: Props) {
+  const [mediaType, setMediaType] = useState<MediaType | null>(null);
+  const [phase, setPhase] = useState<Phase>('select');
   const [batchId, setBatchId] = useState<string | null>(null);
   const [batch, setBatch] = useState<Batch | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleSelect = useCallback((type: MediaType) => {
+    setMediaType(type);
+    setPhase('upload');
+  }, []);
+
+  const handleChangeType = useCallback(() => {
+    setMediaType(null);
+    setPhase('select');
+  }, []);
 
   const handleBatchCreated = useCallback((id: string, _total: number) => {
     setBatchId(id);
@@ -53,12 +66,24 @@ export default function BatchView({ onGoToReview, mediaType = 'vinyl' }: Props) 
     setBatch(null);
   }, []);
 
+  if (phase === 'select') {
+    return <MediaTypeSelector onSelect={handleSelect} />;
+  }
+
   return (
     <div>
+      <div className="media-selected-bar">
+        <div className="media-selected-info">
+          <img src={mediaType === 'cd' ? cdIcon : vinylIcon} alt="" className="media-selected-icon" />
+          <span>{mediaType === 'cd' ? 'CD' : 'Vinyl'}</span>
+        </div>
+        <button className="btn-change-media" onClick={handleChangeType}>Change</button>
+      </div>
+
       {error && <p className="error">{error}</p>}
 
       {phase === 'upload' && (
-        <BatchUpload onBatchCreated={handleBatchCreated} mediaType={mediaType} />
+        <BatchUpload onBatchCreated={handleBatchCreated} mediaType={mediaType!} />
       )}
 
       {phase === 'processing' && batch && (

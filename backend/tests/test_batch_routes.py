@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from auth import User, get_current_user
+from conftest import TEST_USER_ID
 from repository import Batch, BatchItem
 from routes.batch import _process_batch, _reprocess_item
 
@@ -16,17 +18,18 @@ def mock_repo():
     repo = MagicMock()
     repo.saved_records = []
     repo.save_search_record.side_effect = lambda r: repo.saved_records.append(r)
+    repo.load_oauth_tokens.return_value = None
     return repo
 
 
 @pytest.fixture()
-def client(mock_repo):
+def client(mock_repo, mock_jwt_user):
     from deps import get_repo
     from main import app
 
     app.dependency_overrides[get_repo] = lambda: mock_repo
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_repo, None)
 
 
 def _make_zip(files: dict[str, bytes]) -> bytes:
@@ -75,6 +78,9 @@ def test_create_batch_success(client, mock_repo):
     assert "batch_id" in data
     assert mock_repo.save_batch.call_count == 1
     assert mock_repo.save_item.call_count == 2
+    # Verify user_id is set on batch
+    batch_arg = mock_repo.save_batch.call_args[0][0]
+    assert batch_arg.user_id == TEST_USER_ID
 
 
 def test_create_batch_skips_macosx_entries(client, mock_repo):
@@ -99,11 +105,12 @@ def test_create_batch_skips_macosx_entries(client, mock_repo):
 
 
 def test_get_batch_found(client, mock_repo):
-    batch = Batch(batch_id="b1", total_images=3)
+    batch = Batch(batch_id="b1", user_id=TEST_USER_ID, total_images=3)
     mock_repo.find_batch.return_value = batch
     resp = client.get("/api/batch/b1")
     assert resp.status_code == 200
     assert resp.json()["batch_id"] == "b1"
+    mock_repo.find_batch.assert_called_once_with("b1", TEST_USER_ID)
 
 
 def test_get_batch_not_found(client, mock_repo):
@@ -117,8 +124,8 @@ def test_get_batch_not_found(client, mock_repo):
 
 def test_get_batch_items(client, mock_repo):
     items = [
-        BatchItem(item_id="i1", batch_id="b1", image_filename="a.jpg"),
-        BatchItem(item_id="i2", batch_id="b1", image_filename="b.jpg"),
+        BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID, image_filename="a.jpg"),
+        BatchItem(item_id="i2", batch_id="b1", user_id=TEST_USER_ID, image_filename="b.jpg"),
     ]
     mock_repo.find_items_by_batch.return_value = items
     resp = client.get("/api/batch/b1/items")
@@ -130,14 +137,14 @@ def test_get_batch_items_with_review_filter(client, mock_repo):
     mock_repo.find_items_by_batch.return_value = []
     resp = client.get("/api/batch/b1/items?review_status=accepted")
     assert resp.status_code == 200
-    mock_repo.find_items_by_batch.assert_called_once_with("b1", review_status="accepted")
+    mock_repo.find_items_by_batch.assert_called_once_with("b1", TEST_USER_ID, review_status="accepted")
 
 
 # ── PATCH /api/batch/{batch_id}/items/{item_id} ─────────────────────────────
 
 
 def test_review_batch_item_success(client, mock_repo):
-    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1")
+    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID)
     resp = client.patch(
         "/api/batch/b1/items/i1",
         json={"review_status": "accepted", "accepted_release_id": 123},
@@ -157,7 +164,7 @@ def test_review_batch_item_not_found(client, mock_repo):
 
 
 def test_review_batch_item_wrong_batch(client, mock_repo):
-    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="other")
+    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="other", user_id=TEST_USER_ID)
     resp = client.patch(
         "/api/batch/b1/items/i1",
         json={"review_status": "accepted"},
@@ -170,7 +177,7 @@ def test_review_batch_item_wrong_batch(client, mock_repo):
 
 def test_get_all_review_items(client, mock_repo):
     mock_repo.find_all_items.return_value = [
-        BatchItem(item_id="i1", batch_id="b1"),
+        BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID),
     ]
     resp = client.get("/api/review/items")
     assert resp.status_code == 200
@@ -181,28 +188,28 @@ def test_get_all_review_items_filtered(client, mock_repo):
     mock_repo.find_all_items.return_value = []
     resp = client.get("/api/review/items?review_status=skipped")
     assert resp.status_code == 200
-    mock_repo.find_all_items.assert_called_once_with(review_status="skipped", status=None)
+    mock_repo.find_all_items.assert_called_once_with(TEST_USER_ID, review_status="skipped", status=None)
 
 
 def test_get_all_review_items_filtered_by_status(client, mock_repo):
     mock_repo.find_all_items.return_value = []
     resp = client.get("/api/review/items?status=error")
     assert resp.status_code == 200
-    mock_repo.find_all_items.assert_called_once_with(review_status=None, status="error")
+    mock_repo.find_all_items.assert_called_once_with(TEST_USER_ID, review_status=None, status="error")
 
 
 def test_get_all_review_items_filtered_by_both(client, mock_repo):
     mock_repo.find_all_items.return_value = []
     resp = client.get("/api/review/items?review_status=wrong&status=completed")
     assert resp.status_code == 200
-    mock_repo.find_all_items.assert_called_once_with(review_status="wrong", status="completed")
+    mock_repo.find_all_items.assert_called_once_with(TEST_USER_ID, review_status="wrong", status="completed")
 
 
 # ── PATCH /api/review/items/{item_id} ───────────────────────────────────────
 
 
 def test_review_item_success(client, mock_repo):
-    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1")
+    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID)
     resp = client.patch(
         "/api/review/items/i1",
         json={"review_status": "skipped"},
@@ -224,7 +231,7 @@ def test_review_item_not_found(client, mock_repo):
 
 
 def test_undo_review_success(client, mock_repo):
-    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1")
+    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID)
     resp = client.post("/api/review/items/i1/undo")
     assert resp.status_code == 200
     mock_repo.update_item_review.assert_called_once_with("i1", "unreviewed", None)
@@ -264,7 +271,7 @@ def test_process_batch_success():
         patch("routes.batch.process_single_image", return_value=fake_resp),
         patch("routes.batch.time.sleep"),
     ):
-        _process_batch("b1", items, filenames)
+        _process_batch("b1", items, filenames, user_id="u1")
 
     repo.update_item_status.assert_called_once_with("item1", "processing")
     repo.update_item_completed.assert_called_once()
@@ -283,7 +290,7 @@ def test_process_batch_item_failure():
         patch("routes.batch.process_single_image", side_effect=RuntimeError("boom")),
         patch("routes.batch.time.sleep"),
     ):
-        _process_batch("b1", items, filenames)
+        _process_batch("b1", items, filenames, user_id="u1")
 
     repo.update_item_error.assert_called_once_with("item1", "Search pipeline error. Check server logs for details.")
     repo.increment_batch_failed.assert_called_once_with("b1")
@@ -303,7 +310,7 @@ def test_process_batch_telemetry_save_failure():
         patch("routes.batch.process_single_image", return_value=fake_resp),
         patch("routes.batch.time.sleep"),
     ):
-        _process_batch("b1", items, filenames)
+        _process_batch("b1", items, filenames, user_id="u1")
 
     # Batch should still complete despite telemetry failure
     repo.update_batch_status.assert_called_once_with("b1", "completed")
@@ -320,7 +327,7 @@ def test_process_batch_validation_error():
         patch("routes.batch.process_single_image", side_effect=ValueError("Could not extract album")),
         patch("routes.batch.time.sleep"),
     ):
-        _process_batch("b1", items, filenames)
+        _process_batch("b1", items, filenames, user_id="u1")
 
     repo.update_item_error.assert_called_once_with("item1", "Could not extract album")
     repo.increment_batch_failed.assert_called_once_with("b1")
@@ -331,7 +338,7 @@ def test_process_batch_validation_error():
 
 def test_retry_item_success(client, mock_repo):
     mock_repo.find_item.return_value = BatchItem(
-        item_id="i1", batch_id="b1", image_url="/api/uploads/i1.jpg",
+        item_id="i1", batch_id="b1", user_id=TEST_USER_ID, image_url="/api/uploads/test-user-123/i1.jpg",
     )
     with (
         patch("routes.batch.UPLOADS_DIR") as mock_dir,
@@ -363,7 +370,7 @@ def test_retry_item_not_found(client, mock_repo):
 
 
 def test_retry_item_no_image(client, mock_repo):
-    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1", image_url=None)
+    mock_repo.find_item.return_value = BatchItem(item_id="i1", batch_id="b1", user_id=TEST_USER_ID, image_url=None)
     resp = client.post("/api/review/items/i1/retry")
     assert resp.status_code == 422
 
@@ -376,7 +383,7 @@ def test_reprocess_item_success():
         patch("routes.batch.get_repo", return_value=repo),
         patch("routes.batch.process_single_image", return_value=fake_resp),
     ):
-        _reprocess_item("i1", b"jpeg-data", "image/jpeg", batch_id="b1")
+        _reprocess_item("i1", b"jpeg-data", "image/jpeg", batch_id="b1", user_id="u1")
 
     repo.update_item_status.assert_called_once_with("i1", "processing")
     repo.update_item_completed.assert_called_once()
@@ -389,7 +396,7 @@ def test_reprocess_item_validation_error():
         patch("routes.batch.get_repo", return_value=repo),
         patch("routes.batch.process_single_image", side_effect=ValueError("bad label")),
     ):
-        _reprocess_item("i1", b"jpeg-data", "image/jpeg")
+        _reprocess_item("i1", b"jpeg-data", "image/jpeg", user_id="u1")
 
     repo.update_item_error.assert_called_once_with("i1", "bad label")
 
@@ -401,6 +408,6 @@ def test_reprocess_item_unexpected_error():
         patch("routes.batch.get_repo", return_value=repo),
         patch("routes.batch.process_single_image", side_effect=RuntimeError("boom")),
     ):
-        _reprocess_item("i1", b"jpeg-data", "image/jpeg")
+        _reprocess_item("i1", b"jpeg-data", "image/jpeg", user_id="u1")
 
     repo.update_item_error.assert_called_once_with("i1", "Search pipeline error. Check server logs for details.")

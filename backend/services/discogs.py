@@ -8,7 +8,7 @@ import requests
 
 from config import DISCOGS_BASE_URL, DISCOGS_USER_AGENT
 from logger import get_logger
-from services.discogs_auth import build_oauth_headers, get_current_tokens
+from services.discogs_auth import OAuthTokens, build_oauth_headers
 from utils import create_retry_session
 
 log = get_logger("services.discogs")
@@ -21,9 +21,8 @@ _RATE_LIMIT_THRESHOLD = 5
 _RATE_LIMIT_PAUSE = 5  # seconds
 
 
-def _headers() -> dict:
-    """Build auth headers: prefer OAuth tokens, fall back to personal token."""
-    tokens = get_current_tokens()
+def _headers(tokens: OAuthTokens | None = None) -> dict:
+    """Build auth headers: prefer explicit OAuth tokens, fall back to personal token."""
     if tokens:
         return build_oauth_headers(tokens)
     token = os.getenv("DISCOGS_TOKEN")
@@ -47,7 +46,7 @@ def _respect_rate_limit(resp: requests.Response) -> None:
             time.sleep(_RATE_LIMIT_PAUSE)
 
 
-def discogs_search(max_pages: int = 10, **params) -> list[dict]:
+def discogs_search(tokens: OAuthTokens | None = None, max_pages: int = 10, **params) -> list[dict]:
     """Search Discogs with arbitrary params, paginating through all results."""
     params.setdefault("type", "release")
     params.setdefault("per_page", 50)
@@ -58,7 +57,7 @@ def discogs_search(max_pages: int = 10, **params) -> list[dict]:
         params["page"] = page
         resp = _session.get(
             f"{DISCOGS_BASE_URL}/database/search",
-            headers=_headers(),
+            headers=_headers(tokens),
             params=params,
         )
         log.debug("Discogs API: page=%d status=%d", page, resp.status_code)
@@ -163,6 +162,7 @@ def generate_search_candidates(
     media_type: str = "vinyl",
     tried: list[str] | None = None,
     candidate_tracks: list[str] | None = None,
+    tokens: OAuthTokens | None = None,
 ) -> Generator[tuple[list[dict], str], None, None]:
     """Yield (sane_results, strategy_name) for each strategy that produces results.
 
@@ -194,7 +194,7 @@ def generate_search_candidates(
                 f" + label='{label_meta['label']}'" if "label" in params else ""
             )
             log.info("Strategy 1: catno search — %s", params)
-            results = discogs_search(**params)
+            results = discogs_search(tokens, **params)
             if results:
                 sane = _try(results, strategy)
                 if sane:
@@ -203,7 +203,7 @@ def generate_search_candidates(
             if label_meta.get("label"):
                 strategy_1b = f"catno='{catno_variant}'"
                 log.info("Strategy 1b: catno only (dropping label)")
-                results = discogs_search(catno=catno_variant, **fmt)
+                results = discogs_search(tokens, catno=catno_variant, **fmt)
                 if results:
                     sane = _try(results, strategy_1b)
                     if sane:
@@ -219,7 +219,7 @@ def generate_search_candidates(
                 query = f"{artist} {album}"
                 strategy = f"q='{query}'"
             log.info("Strategy 2: freeform q='%s'", query)
-            results = discogs_search(q=query, **fmt)
+            results = discogs_search(tokens, q=query, **fmt)
             if results:
                 sane = _try(results, strategy)
                 if sane:
@@ -230,7 +230,7 @@ def generate_search_candidates(
         for artist in candidate_artists:
             strategy = f"release_title='{album}' + artist='{artist}'"
             log.info("Strategy 3: release_title='%s' artist='%s'", album, artist)
-            results = discogs_search(artist=artist, release_title=album, **fmt)
+            results = discogs_search(tokens, artist=artist, release_title=album, **fmt)
             if results:
                 sane = _try(results, strategy)
                 if sane:
@@ -239,7 +239,7 @@ def generate_search_candidates(
     # 4. Artist-only search, fuzzy match titles
     for artist in candidate_artists:
         log.info("Strategy 4: artist-only '%s'", artist)
-        artist_results = discogs_search(artist=artist, **fmt)
+        artist_results = discogs_search(tokens, artist=artist, **fmt)
         if not artist_results:
             tried.append(f"artist='{artist}' (no results)")
             continue
@@ -268,7 +268,7 @@ def generate_search_candidates(
         query = " ".join(query_tracks)
         strategy = f"q='{query}' (track names)"
         log.info("Strategy 5: track name search q='%s'", query)
-        results = discogs_search(q=query, **fmt)
+        results = discogs_search(tokens, q=query, **fmt)
         if results:
             tried.append(strategy)
             log.info("Strategy 5: %d results for track query", len(results))
@@ -324,22 +324,22 @@ def score_by_metadata(releases: list[dict], label_meta: dict) -> list[dict]:
     return filtered
 
 
-def get_marketplace_stats(release_id: int) -> dict:
+def get_marketplace_stats(release_id: int, tokens: OAuthTokens | None = None) -> dict:
     """Fetch marketplace price stats for a release."""
     resp = _session.get(
         f"{DISCOGS_BASE_URL}/marketplace/stats/{release_id}",
-        headers=_headers(),
+        headers=_headers(tokens),
     )
     _respect_rate_limit(resp)
     resp.raise_for_status()
     return resp.json()
 
 
-def get_identity() -> str:
+def get_identity(tokens: OAuthTokens | None = None) -> str:
     """Get the authenticated Discogs username via /oauth/identity."""
     resp = _session.get(
         f"{DISCOGS_BASE_URL}/oauth/identity",
-        headers=_headers(),
+        headers=_headers(tokens),
     )
     _respect_rate_limit(resp)
     resp.raise_for_status()
@@ -347,18 +347,18 @@ def get_identity() -> str:
 
 
 def get_collection(
+    tokens: OAuthTokens | None = None,
     page: int = 1,
     per_page: int = 50,
     sort: str = "artist",
     sort_order: str = "asc",
 ) -> dict:
     """Fetch the authenticated user's Discogs collection (folder 0 = all)."""
-    tokens = get_current_tokens()
-    username = tokens.username if tokens and tokens.username else get_identity()
+    username = tokens.username if tokens and tokens.username else get_identity(tokens)
     log.info("Fetching collection page %d for user '%s'", page, username)
     resp = _session.get(
         f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/0/releases",
-        headers=_headers(),
+        headers=_headers(tokens),
         params={
             "page": page,
             "per_page": per_page,
@@ -371,14 +371,13 @@ def get_collection(
     return resp.json()
 
 
-def add_to_collection(release_id: int) -> dict:
+def add_to_collection(release_id: int, tokens: OAuthTokens | None = None) -> dict:
     """Add a release to the user's Discogs collection (Uncategorized folder)."""
-    tokens = get_current_tokens()
-    username = tokens.username if tokens and tokens.username else get_identity()
+    username = tokens.username if tokens and tokens.username else get_identity(tokens)
     log.info("Adding release %d to collection for user '%s'", release_id, username)
     resp = _session.post(
         f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/1/releases/{release_id}",
-        headers=_headers(),
+        headers=_headers(tokens),
     )
     _respect_rate_limit(resp)
     resp.raise_for_status()

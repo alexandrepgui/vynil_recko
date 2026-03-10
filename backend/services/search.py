@@ -7,6 +7,7 @@ from deps import get_repo
 from models import DiscogsResult, LabelData, SearchResponse
 from repository import LLMUsageRecord
 from services.discogs import generate_search_candidates, prefilter, score_by_metadata
+from services.discogs_auth import OAuthTokens
 from services.llm import LLMResponse
 from services.vision import rank_results, read_label_image
 from logger import get_logger
@@ -38,6 +39,7 @@ def _log_llm_usage(
     cache_hit: bool = False,
     batch_id: str | None = None,
     item_id: str | None = None,
+    user_id: str = "",
 ) -> None:
     """Persist an LLM usage record. Skip on cache hits or missing response."""
     if cache_hit or llm_response is None:
@@ -45,6 +47,7 @@ def _log_llm_usage(
     try:
         repo = get_repo()
         record = LLMUsageRecord(
+            user_id=user_id,
             provider=llm_response.provider,
             model=llm_response.model,
             operation=operation,
@@ -139,6 +142,8 @@ def process_single_image(
     media_type: str = "vinyl",
     batch_id: str | None = None,
     item_id: str | None = None,
+    user_id: str = "",
+    tokens: OAuthTokens | None = None,
 ) -> SearchResponse:
     """Run the full search pipeline for a single image.
 
@@ -149,7 +154,7 @@ def process_single_image(
     label_data, conversation, cache_hit, vision_usage = read_label_image(image_bytes, content_type, media_type)
     vision_ms = (time.time() - t0) * 1000
 
-    _log_llm_usage("label_reading", vision_usage, cache_hit=cache_hit, batch_id=batch_id, item_id=item_id)
+    _log_llm_usage("label_reading", vision_usage, cache_hit=cache_hit, batch_id=batch_id, item_id=item_id, user_id=user_id)
 
     candidate_albums = [a for a in (label_data.get("albums") or []) if a]
     candidate_artists = [a for a in (label_data.get("artists") or []) if a]
@@ -202,6 +207,7 @@ def process_single_image(
         candidate_albums or [], candidate_artists or [], label_meta,
         media_type=media_type, tried=strategies_tried,
         candidate_tracks=candidate_tracks,
+        tokens=tokens,
     ):
         # Skip artist prefilter for track-name strategies (no artist to filter on)
         if candidate_artists and "track names" not in strategy:
@@ -216,7 +222,7 @@ def process_single_image(
         )
         ranking_ms = (time.time() - t2) * 1000
 
-        _log_llm_usage("ranking", ranking_usage, batch_id=batch_id, item_id=item_id)
+        _log_llm_usage("ranking", ranking_usage, batch_id=batch_id, item_id=item_id, user_id=user_id)
 
         ordered = _build_ordered(scored, likeliness, discarded)
         if ordered:

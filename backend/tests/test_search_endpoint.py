@@ -1,6 +1,7 @@
 """Integration tests for POST /api/search with telemetry recording.
 
 Every test mocks:
+  - Supabase JWT via get_current_user dependency override
   - LLM API via services.vision._get_client (provider abstraction layer)
   - Discogs API via services.discogs._session.get
   - MongoDB repository via FastAPI dependency override
@@ -14,10 +15,12 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from auth import User, get_current_user
 from conftest import (
     FAKE_DISCOGS_RESULT,
     FAKE_LABEL_DATA,
     FAKE_RANKING,
+    TEST_USER_ID,
     make_discogs_response,
     make_mock_llm_client,
 )
@@ -29,15 +32,15 @@ from repository.models import SearchRecord
 
 
 @pytest.fixture()
-def client(mock_repo):
-    """FastAPI test client with mocked repository."""
+def client(mock_repo, mock_jwt_user):
+    """FastAPI test client with mocked repository and JWT user."""
     from deps import get_repo
     from main import app
 
     app.dependency_overrides[get_repo] = lambda: mock_repo
     with patch("services.search.get_repo", return_value=mock_repo):
         yield TestClient(app)
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_repo, None)
 
 
 def _upload_file(client, content=b"fake-jpeg-data", content_type="image/jpeg", filename="label.jpg"):
@@ -72,6 +75,7 @@ def test_success_full_pipeline(client, mock_repo):
     assert mock_repo.save_search_record.call_count == 1
     record: SearchRecord = mock_repo.saved_records[0]
     assert record.status == SearchStatus.SUCCESS
+    assert record.user_id == TEST_USER_ID
     assert record.total_returned == 1
     assert record.top_match_title == "Miles Davis - Kind of Blue"
     assert record.total_duration_ms is not None
@@ -94,7 +98,6 @@ def test_invalid_content_type(client, mock_repo):
 def test_pipeline_error_on_llm_failure(client, mock_repo):
     """When the LLM is unreachable, pipeline returns 502 and records error."""
     huge_content = b"x" * 1024
-    from services.llm.base import LLMResponse
     from unittest.mock import MagicMock
 
     mock_client = MagicMock()

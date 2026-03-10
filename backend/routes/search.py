@@ -3,6 +3,7 @@ import time
 import requests
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 
+from auth import User, get_current_user
 from config import SINGLE_SEARCH_BATCH_ID
 from deps import get_repo
 from logger import get_logger
@@ -10,15 +11,13 @@ from models import AddToCollectionRequest, MediaType, SearchResponse
 from repository import BatchItem, CollectionRecord, SearchRecord
 from repository.mongo import MongoRepository
 from services.discogs import add_to_collection, get_marketplace_stats
+from services.discogs_auth import load_tokens_for_user
 from services.search import process_single_image
 from utils import save_upload_image
 
 log = get_logger("routes.search")
 
 router = APIRouter()
-
-# TODO: Re-enable file size limit once we determine the right threshold
-# MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def _save_record(repo: MongoRepository, record: SearchRecord, start_time: float) -> None:
@@ -34,12 +33,13 @@ def _save_record(repo: MongoRepository, record: SearchRecord, start_time: float)
 async def search(
     file: UploadFile,
     media_type: MediaType = Form(MediaType.VINYL),
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
     request_start = time.time()
-    record = SearchRecord(image_filename=file.filename)
+    record = SearchRecord(image_filename=file.filename, user_id=user.id)
 
-    log.info("Search request: filename=%s content_type=%s", file.filename, file.content_type)
+    log.info("Search request: user_id=%s filename=%s content_type=%s", user.id, file.filename, file.content_type)
 
     if file.content_type not in ("image/jpeg", "image/png"):
         log.warning("Rejected: invalid content type %s", file.content_type)
@@ -51,15 +51,13 @@ async def search(
     record.image_size_bytes = len(image_bytes)
     log.info("Image size: %d bytes (%.1f KB)", len(image_bytes), len(image_bytes) / 1024)
 
-    # TODO: Re-enable file size limit
-    # if len(image_bytes) > MAX_FILE_SIZE:
-    #     log.warning("Rejected: file too large (%d bytes)", len(image_bytes))
-    #     record.status = "error_validation"
-    #     _save_record(repo, record, request_start)
-    #     raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+    tokens = load_tokens_for_user(repo, user.id)
 
     try:
-        response = process_single_image(image_bytes, file.content_type, media_type=media_type)
+        response = process_single_image(
+            image_bytes, file.content_type, media_type=media_type,
+            user_id=user.id, tokens=tokens,
+        )
     except ValueError as e:
         record.status = "error_vision"
         log.error("Search pipeline failed (validation): %s", e)
@@ -80,6 +78,7 @@ async def search(
     try:
         item = BatchItem(
             batch_id=SINGLE_SEARCH_BATCH_ID,
+            user_id=user.id,
             image_filename=file.filename or "upload",
             status="completed",
             label_data=response.label_data.model_dump(),
@@ -87,7 +86,7 @@ async def search(
             strategy=response.strategy,
             debug=response.debug,
         )
-        item.image_url = save_upload_image(item.item_id, file.filename or "upload.jpg", image_bytes)
+        item.image_url = save_upload_image(item.item_id, file.filename or "upload.jpg", image_bytes, user_id=user.id)
         repo.save_item(item)
         response.item_id = item.item_id
     except Exception as e:
@@ -100,14 +99,18 @@ async def search(
 @router.post("/api/collection")
 async def add_to_collection_endpoint(
     body: AddToCollectionRequest,
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
     request_start = time.time()
-    record = CollectionRecord(release_id=body.release_id)
+    record = CollectionRecord(release_id=body.release_id, user_id=user.id)
 
-    log.info("Add to collection request: release_id=%d", body.release_id)
+    log.info("Add to collection request: user_id=%s release_id=%d", user.id, body.release_id)
+
+    tokens = load_tokens_for_user(repo, user.id)
+
     try:
-        instance = add_to_collection(body.release_id)
+        instance = add_to_collection(body.release_id, tokens=tokens)
     except requests.HTTPError as e:
         status = e.response.status_code if e.response is not None else 502
         record.status = "error"
@@ -148,10 +151,15 @@ async def add_to_collection_endpoint(
 
 
 @router.get("/api/price/{release_id}")
-async def get_price(release_id: int):
+async def get_price(
+    release_id: int,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
     """Fetch marketplace price stats for a Discogs release."""
+    tokens = load_tokens_for_user(repo, user.id)
     try:
-        stats = get_marketplace_stats(release_id)
+        stats = get_marketplace_stats(release_id, tokens=tokens)
     except requests.HTTPError as e:
         status = e.response.status_code if e.response is not None else 502
         if status == 404:

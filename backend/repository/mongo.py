@@ -28,31 +28,37 @@ class MongoRepository:
         log.info("MongoDB repository: db=%s", database)
 
     def _ensure_indexes(self) -> None:
-        self._collection_items.create_index("instance_id", unique=True)
+        self._collection_items.create_index(
+            [("user_id", ASCENDING), ("instance_id", ASCENDING)],
+            unique=True,
+            name="user_instance_unique",
+        )
         self._collection_items.create_index([
             ("title", "text"),
             ("artist", "text"),
         ], name="collection_text_search")
+        self._items.create_index([("user_id", ASCENDING), ("batch_id", ASCENDING)])
+        self._batches.create_index([("user_id", ASCENDING)])
 
     # ── OAuth tokens ─────────────────────────────────────────────────────
 
-    def save_oauth_tokens(self, access_token: str, access_token_secret: str, username: str | None) -> None:
+    def save_oauth_tokens(self, user_id: str, access_token: str, access_token_secret: str, username: str | None) -> None:
         self._db["oauth_tokens"].replace_one(
-            {"_id": "discogs"},
-            {"_id": "discogs", "access_token": access_token, "access_token_secret": access_token_secret, "username": username},
+            {"_id": user_id},
+            {"_id": user_id, "access_token": access_token, "access_token_secret": access_token_secret, "username": username},
             upsert=True,
         )
-        log.info("OAuth tokens persisted for user=%s", username)
+        log.info("OAuth tokens persisted for user_id=%s username=%s", user_id, username)
 
-    def load_oauth_tokens(self) -> dict | None:
-        doc = self._db["oauth_tokens"].find_one({"_id": "discogs"})
+    def load_oauth_tokens(self, user_id: str) -> dict | None:
+        doc = self._db["oauth_tokens"].find_one({"_id": user_id})
         if doc:
             return {"access_token": doc["access_token"], "access_token_secret": doc["access_token_secret"], "username": doc.get("username")}
         return None
 
-    def delete_oauth_tokens(self) -> None:
-        self._db["oauth_tokens"].delete_one({"_id": "discogs"})
-        log.info("OAuth tokens deleted")
+    def delete_oauth_tokens(self, user_id: str) -> None:
+        self._db["oauth_tokens"].delete_one({"_id": user_id})
+        log.info("OAuth tokens deleted for user_id=%s", user_id)
 
     # ── Collection items (persisted Discogs collection) ────────────────────
 
@@ -60,7 +66,11 @@ class MongoRepository:
         if not items:
             return 0
         ops = [
-            ReplaceOne({"instance_id": item.instance_id}, item.to_dict(), upsert=True)
+            ReplaceOne(
+                {"user_id": item.user_id, "instance_id": item.instance_id},
+                item.to_dict(),
+                upsert=True,
+            )
             for item in items
         ]
         result = self._collection_items.bulk_write(ops)
@@ -76,13 +86,14 @@ class MongoRepository:
 
     def find_collection_items(
         self,
+        user_id: str,
         query: str | None = None,
         sort: str = "artist",
         sort_order: str = "asc",
         skip: int = 0,
         limit: int = 50,
     ) -> list[CollectionItem]:
-        filt: dict = {}
+        filt: dict = {"user_id": user_id}
         if query:
             filt["$text"] = {"$search": query}
 
@@ -102,28 +113,28 @@ class MongoRepository:
         )
         return [CollectionItem.from_dict(doc) for doc in cursor]
 
-    def count_collection_items(self, query: str | None = None) -> int:
-        filt: dict = {}
+    def count_collection_items(self, user_id: str, query: str | None = None) -> int:
+        filt: dict = {"user_id": user_id}
         if query:
             filt["$text"] = {"$search": query}
         return self._collection_items.count_documents(filt)
 
-    def delete_stale_items(self, synced_before: str) -> int:
+    def delete_stale_items(self, user_id: str, synced_before: str) -> int:
         """Delete collection items that were not updated during the latest sync."""
         result = self._collection_items.delete_many(
-            {"synced_at": {"$lt": synced_before}}
+            {"user_id": user_id, "synced_at": {"$lt": synced_before}}
         )
         return result.deleted_count
 
     # ── Sync status ────────────────────────────────────────────────────────
 
-    def get_sync_status(self) -> dict:
-        doc = self._sync_status.find_one({"_id": "collection"}, {"_id": 0})
+    def get_sync_status(self, user_id: str) -> dict:
+        doc = self._sync_status.find_one({"_id": user_id}, {"_id": 0})
         return doc or {"status": "idle"}
 
-    def update_sync_status(self, update: dict) -> None:
+    def update_sync_status(self, user_id: str, update: dict) -> None:
         self._sync_status.update_one(
-            {"_id": "collection"},
+            {"_id": user_id},
             {"$set": update},
             upsert=True,
         )
@@ -176,8 +187,8 @@ class MongoRepository:
         )
         log.info("Saved batch %s (status=%s)", batch.batch_id, batch.status)
 
-    def find_batch(self, batch_id: str) -> Batch | None:
-        doc = self._batches.find_one({"batch_id": batch_id}, {"_id": 0})
+    def find_batch(self, batch_id: str, user_id: str) -> Batch | None:
+        doc = self._batches.find_one({"batch_id": batch_id, "user_id": user_id}, {"_id": 0})
         return Batch.from_dict(doc) if doc else None
 
     def update_batch_status(self, batch_id: str, status: str) -> None:
@@ -196,24 +207,24 @@ class MongoRepository:
             {"item_id": item.item_id}, item.to_dict(), upsert=True,
         )
 
-    def find_item(self, item_id: str) -> BatchItem | None:
-        doc = self._items.find_one({"item_id": item_id}, {"_id": 0})
+    def find_item(self, item_id: str, user_id: str) -> BatchItem | None:
+        doc = self._items.find_one({"item_id": item_id, "user_id": user_id}, {"_id": 0})
         return BatchItem.from_dict(doc) if doc else None
 
     def find_items_by_batch(
-        self, batch_id: str, review_status: str | None = None,
+        self, batch_id: str, user_id: str, review_status: str | None = None,
     ) -> list[BatchItem]:
-        query: dict = {"batch_id": batch_id}
+        query: dict = {"batch_id": batch_id, "user_id": user_id}
         if review_status is not None:
             query["review_status"] = review_status
         cursor = self._items.find(query, {"_id": 0}).sort("created_at", 1)
         return [BatchItem.from_dict(doc) for doc in cursor]
 
     def find_all_items(
-        self, review_status: str | None = None, status: str | None = None,
+        self, user_id: str, review_status: str | None = None, status: str | None = None,
     ) -> list[BatchItem]:
         """Query across all batches, optionally filtered by review_status and/or status."""
-        query: dict = {}
+        query: dict = {"user_id": user_id}
         if review_status is not None:
             query["review_status"] = review_status
         if status is not None:
@@ -276,14 +287,14 @@ class MongoRepository:
         )
         log.debug("Saved LLM usage %s (op=%s cost=$%.6f)", record.record_id, record.operation, record.cost_usd)
 
-    def get_usage_summary(self, days: int = 30) -> dict:
+    def get_usage_summary(self, user_id: str, days: int = 30) -> dict:
         """Aggregate LLM usage stats over the last N days."""
         cutoff = datetime.now(timezone.utc)
         cutoff = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
         from datetime import timedelta
         cutoff_str = (cutoff - timedelta(days=days)).isoformat()
 
-        match_stage = {"$match": {"timestamp": {"$gte": cutoff_str}, "cache_hit": False}}
+        match_stage = {"$match": {"user_id": user_id, "timestamp": {"$gte": cutoff_str}, "cache_hit": False}}
 
         pipeline = [
             match_stage,

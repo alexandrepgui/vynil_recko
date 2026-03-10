@@ -6,6 +6,7 @@ Handles the three-legged OAuth flow:
   3. Exchange verifier for access token
 
 Uses PLAINTEXT signature method (Discogs default, safe over HTTPS).
+Each user's OAuth tokens are stored separately in the database (keyed by Supabase user ID).
 """
 
 import os
@@ -42,14 +43,14 @@ class OAuthTokens:
 @dataclass
 class PendingOAuth:
     """Temporary state held between request-token and access-token steps."""
+    user_id: str
     request_token: str
     request_token_secret: str
     created_at: float = field(default_factory=time.time)
 
 
-# In-memory store. Single-user app, so one slot is sufficient.
-_pending: dict[str, PendingOAuth] = {}  # keyed by request_token
-_current_tokens: OAuthTokens | None = None
+# In-memory store for pending OAuth flows, keyed by request_token.
+_pending: dict[str, PendingOAuth] = {}
 
 
 def _consumer_key() -> str:
@@ -102,29 +103,11 @@ def is_configured() -> bool:
     return bool(_consumer_key() and _consumer_secret())
 
 
-def get_current_tokens() -> OAuthTokens | None:
-    """Return the stored OAuth access tokens, if available."""
-    return _current_tokens
-
-
-def set_tokens(tokens: OAuthTokens) -> None:
-    """Restore OAuth tokens (e.g. from database on startup)."""
-    global _current_tokens
-    _current_tokens = tokens
-    log.info("OAuth tokens restored for user=%s", tokens.username)
-
-
-def clear_tokens() -> None:
-    """Clear stored OAuth tokens (logout)."""
-    global _current_tokens
-    _current_tokens = None
-    log.info("OAuth tokens cleared")
-
-
-def get_request_token(callback_url: str) -> tuple[str, str]:
+def get_request_token(user_id: str, callback_url: str) -> tuple[str, str]:
     """Step 1: Obtain a request token and return (request_token, authorize_url).
 
     Args:
+        user_id: The authenticated Supabase user ID (stored in pending state).
         callback_url: The URL Discogs will redirect to after authorization.
 
     Returns:
@@ -148,16 +131,17 @@ def get_request_token(callback_url: str) -> tuple[str, str]:
     request_token_secret = body["oauth_token_secret"]
 
     _pending[request_token] = PendingOAuth(
+        user_id=user_id,
         request_token=request_token,
         request_token_secret=request_token_secret,
     )
 
     authorize_url = f"{AUTHORIZE_URL}?oauth_token={request_token}"
-    log.info("Request token obtained, authorize URL: %s", authorize_url)
+    log.info("Request token obtained for user_id=%s, authorize URL: %s", user_id, authorize_url)
     return request_token, authorize_url
 
 
-def exchange_verifier(oauth_token: str, oauth_verifier: str) -> OAuthTokens:
+def exchange_verifier(oauth_token: str, oauth_verifier: str) -> tuple[OAuthTokens, str]:
     """Step 3: Exchange the request token + verifier for an access token.
 
     Args:
@@ -165,10 +149,8 @@ def exchange_verifier(oauth_token: str, oauth_verifier: str) -> OAuthTokens:
         oauth_verifier: The verifier code from the callback.
 
     Returns:
-        OAuthTokens with the permanent access token and secret.
+        Tuple of (OAuthTokens with permanent access token, user_id from pending state).
     """
-    global _current_tokens
-
     pending = _pending.pop(oauth_token, None)
     if not pending:
         raise ValueError(f"No pending OAuth flow found for token {oauth_token!r}")
@@ -194,9 +176,8 @@ def exchange_verifier(oauth_token: str, oauth_verifier: str) -> OAuthTokens:
         access_token_secret=body["oauth_token_secret"],
     )
 
-    _current_tokens = tokens
-    log.info("OAuth access token obtained successfully")
-    return tokens
+    log.info("OAuth access token obtained for user_id=%s", pending.user_id)
+    return tokens, pending.user_id
 
 
 def build_oauth_headers(tokens: OAuthTokens) -> dict:
@@ -206,3 +187,15 @@ def build_oauth_headers(tokens: OAuthTokens) -> dict:
         oauth_token=tokens.access_token,
     )
     return {"Authorization": _oauth_header(auth_params)}
+
+
+def load_tokens_for_user(repo, user_id: str) -> OAuthTokens | None:
+    """Load a user's Discogs OAuth tokens from the database."""
+    saved = repo.load_oauth_tokens(user_id)
+    if saved:
+        return OAuthTokens(
+            access_token=saved["access_token"],
+            access_token_secret=saved["access_token_secret"],
+            username=saved.get("username"),
+        )
+    return None

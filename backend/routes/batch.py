@@ -5,12 +5,14 @@ import zipfile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile
 
+from auth import User, get_current_user
 from config import UPLOADS_DIR
 from deps import get_repo
 from logger import get_logger
 from models import ItemStatus, MediaType, ReviewAction, ReviewStatus
 from repository import Batch, BatchItem, SearchRecord
 from repository.mongo import MongoRepository
+from services.discogs_auth import OAuthTokens, load_tokens_for_user
 from services.search import process_single_image
 from services.vision import invalidate_cache
 from utils import save_upload_image
@@ -41,19 +43,26 @@ def _process_batch(
     items: list[tuple[str, bytes, str]],
     filenames: dict[str, str],
     media_type: str = "vinyl",
+    user_id: str = "",
+    tokens: OAuthTokens | None = None,
 ) -> None:
     """Background task: process each image sequentially."""
     repo = get_repo()
     for item_id, image_bytes, content_type in items:
         record = SearchRecord(
+            user_id=user_id,
             image_filename=filenames.get(item_id, "unknown"),
             image_size_bytes=len(image_bytes),
             batch_id=batch_id,
         )
         request_start = time.time()
         try:
-            repo.update_item_status(item_id, "processing")
-            response = process_single_image(image_bytes, content_type, media_type=media_type, batch_id=batch_id, item_id=item_id)
+            repo.update_item_status(item_id, ItemStatus.PROCESSING)
+            response = process_single_image(
+                image_bytes, content_type, media_type=media_type,
+                batch_id=batch_id, item_id=item_id,
+                user_id=user_id, tokens=tokens,
+            )
             repo.update_item_completed(
                 item_id,
                 label_data=response.label_data.model_dump(),
@@ -84,7 +93,7 @@ def _process_batch(
         # Respect Discogs rate limits (~60 req/min)
         time.sleep(1)
 
-    repo.update_batch_status(batch_id, "completed")
+    repo.update_batch_status(batch_id, "completed")  # Batch status not yet typed as enum
     log.info("Batch %s completed", batch_id)
 
 
@@ -93,6 +102,7 @@ async def create_batch(
     file: UploadFile,
     background_tasks: BackgroundTasks,
     media_type: MediaType = Form(MediaType.VINYL),
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
     if not (file.filename or "").lower().endswith(".zip"):
@@ -105,6 +115,7 @@ async def create_batch(
         raise HTTPException(422, "No JPEG or PNG images found in the zip.")
 
     batch = Batch(
+        user_id=user.id,
         total_images=len(image_files),
         original_filename=file.filename,
     )
@@ -113,21 +124,29 @@ async def create_batch(
     task_items: list[tuple[str, bytes, str]] = []
     filenames: dict[str, str] = {}
     for filename, img_bytes, content_type in image_files:
-        item = BatchItem(batch_id=batch.batch_id, image_filename=filename)
-        item.image_url = save_upload_image(item.item_id, filename, img_bytes)
+        item = BatchItem(batch_id=batch.batch_id, user_id=user.id, image_filename=filename)
+        item.image_url = save_upload_image(item.item_id, filename, img_bytes, user_id=user.id)
         repo.save_item(item)
         task_items.append((item.item_id, img_bytes, content_type))
         filenames[item.item_id] = filename
 
-    background_tasks.add_task(_process_batch, batch.batch_id, task_items, filenames, media_type)
-    log.info("Batch %s created: %d images", batch.batch_id, len(image_files))
+    tokens = load_tokens_for_user(repo, user.id)
+    background_tasks.add_task(
+        _process_batch, batch.batch_id, task_items, filenames, media_type,
+        user_id=user.id, tokens=tokens,
+    )
+    log.info("Batch %s created: %d images (user_id=%s)", batch.batch_id, len(image_files), user.id)
 
     return {"batch_id": batch.batch_id, "total_images": len(image_files)}
 
 
 @router.get("/api/batch/{batch_id}")
-async def get_batch(batch_id: str, repo: MongoRepository = Depends(get_repo)):
-    batch = repo.find_batch(batch_id)
+async def get_batch(
+    batch_id: str,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    batch = repo.find_batch(batch_id, user.id)
     if not batch:
         raise HTTPException(404, "Batch not found.")
     return batch.to_dict()
@@ -137,9 +156,10 @@ async def get_batch(batch_id: str, repo: MongoRepository = Depends(get_repo)):
 async def get_batch_items(
     batch_id: str,
     review_status: ReviewStatus | None = Query(None),
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
-    items = repo.find_items_by_batch(batch_id, review_status=review_status)
+    items = repo.find_items_by_batch(batch_id, user.id, review_status=review_status)
     return [item.to_dict() for item in items]
 
 
@@ -148,9 +168,10 @@ async def review_batch_item(
     batch_id: str,
     item_id: str,
     body: ReviewAction,
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
-    item = repo.find_item(item_id)
+    item = repo.find_item(item_id, user.id)
     if not item or item.batch_id != batch_id:
         raise HTTPException(404, "Item not found.")
     repo.update_item_review(item_id, body.review_status, body.accepted_release_id)
@@ -164,9 +185,10 @@ async def review_batch_item(
 async def get_all_review_items(
     review_status: ReviewStatus | None = Query(None),
     status: ItemStatus | None = Query(None),
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
-    items = repo.find_all_items(review_status=review_status, status=status)
+    items = repo.find_all_items(user.id, review_status=review_status, status=status)
     return [item.to_dict() for item in items]
 
 
@@ -174,9 +196,10 @@ async def get_all_review_items(
 async def review_item(
     item_id: str,
     body: ReviewAction,
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
-    item = repo.find_item(item_id)
+    item = repo.find_item(item_id, user.id)
     if not item:
         raise HTTPException(404, "Item not found.")
     repo.update_item_review(item_id, body.review_status, body.accepted_release_id)
@@ -184,20 +207,32 @@ async def review_item(
 
 
 @router.post("/api/review/items/{item_id}/undo")
-async def undo_review_item(item_id: str, repo: MongoRepository = Depends(get_repo)):
-    item = repo.find_item(item_id)
+async def undo_review_item(
+    item_id: str,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    item = repo.find_item(item_id, user.id)
     if not item:
         raise HTTPException(404, "Item not found.")
     repo.update_item_review(item_id, ReviewStatus.UNREVIEWED, None)
     return {"ok": True}
 
 
-def _reprocess_item(item_id: str, image_bytes: bytes, content_type: str, batch_id: str | None = None) -> None:
+def _reprocess_item(
+    item_id: str, image_bytes: bytes, content_type: str,
+    batch_id: str | None = None, user_id: str = "",
+    tokens: OAuthTokens | None = None,
+) -> None:
     """Background task: re-run the processing pipeline for a single item."""
     repo = get_repo()
     try:
-        repo.update_item_status(item_id, "processing")
-        response = process_single_image(image_bytes, content_type, media_type="vinyl", batch_id=batch_id, item_id=item_id)
+        repo.update_item_status(item_id, ItemStatus.PROCESSING)
+        response = process_single_image(
+            image_bytes, content_type, media_type="vinyl",
+            batch_id=batch_id, item_id=item_id,
+            user_id=user_id, tokens=tokens,
+        )
         repo.update_item_completed(
             item_id,
             label_data=response.label_data.model_dump(),
@@ -217,21 +252,25 @@ def _reprocess_item(item_id: str, image_bytes: bytes, content_type: str, batch_i
 async def retry_item(
     item_id: str,
     background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
     repo: MongoRepository = Depends(get_repo),
 ):
-    item = repo.find_item(item_id)
+    item = repo.find_item(item_id, user.id)
     if not item:
         raise HTTPException(404, "Item not found.")
     if not item.image_url:
         raise HTTPException(422, "No saved image to reprocess.")
 
-    # Resolve image path from URL (e.g. /api/uploads/abc.jpg → .uploads/abc.jpg)
-    filename = item.image_url.rsplit("/", 1)[-1]
-    image_path = UPLOADS_DIR / filename
-    if not image_path.is_file():
-        raise HTTPException(422, "Image file not found on disk.")
+    # Resolve image path from URL (e.g. /api/uploads/uid/abc.jpg → .uploads/uid/abc.jpg)
+    url_path = item.image_url.replace("/api/uploads/", "")
+    image_path = (UPLOADS_DIR / url_path).resolve()
+    if not image_path.is_relative_to(UPLOADS_DIR.resolve()):
+        raise HTTPException(403, "Invalid image path.")
 
-    image_bytes = image_path.read_bytes()
+    try:
+        image_bytes = image_path.read_bytes()
+    except FileNotFoundError:
+        raise HTTPException(422, "Image file not found on disk.")
     ext = image_path.suffix.lower()
     content_type = _EXT_TO_MIME.get(ext, "image/jpeg")
 
@@ -239,8 +278,12 @@ async def retry_item(
     invalidate_cache(image_bytes)
 
     # Reset item state
-    repo.update_item_status(item_id, "pending")
+    repo.update_item_status(item_id, ItemStatus.PENDING)
     repo.update_item_review(item_id, ReviewStatus.UNREVIEWED, None)
 
-    background_tasks.add_task(_reprocess_item, item_id, image_bytes, content_type, item.batch_id)
+    tokens = load_tokens_for_user(repo, user.id)
+    background_tasks.add_task(
+        _reprocess_item, item_id, image_bytes, content_type,
+        item.batch_id, user_id=user.id, tokens=tokens,
+    )
     return {"ok": True}

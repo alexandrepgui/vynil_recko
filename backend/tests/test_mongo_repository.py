@@ -7,6 +7,8 @@ import pytest
 from repository import Batch, BatchItem, CollectionRecord, SearchRecord
 from repository.mongo import MongoRepository
 
+USER_ID = "user-123"
+
 
 @pytest.fixture()
 def repo():
@@ -26,7 +28,7 @@ def repo():
 
 
 def test_save_search_record(repo):
-    record = SearchRecord(request_id="r1", status="success")
+    record = SearchRecord(request_id="r1", user_id=USER_ID, status="success")
     repo.save_search_record(record)
     repo._search_records.replace_one.assert_called_once()
     call_args = repo._search_records.replace_one.call_args
@@ -36,7 +38,7 @@ def test_save_search_record(repo):
 
 def test_find_search_record_found(repo):
     repo._search_records.find_one.return_value = {
-        "request_id": "r1", "status": "success", "timestamp": "2024-01-01",
+        "request_id": "r1", "user_id": USER_ID, "status": "success", "timestamp": "2024-01-01",
     }
     result = repo.find_search_record("r1")
     assert result is not None
@@ -53,7 +55,7 @@ def test_find_all_search_records(repo):
     cursor.sort.return_value = cursor
     cursor.skip.return_value = cursor
     cursor.limit.return_value = [
-        {"request_id": "r1", "status": "success", "timestamp": "t1"},
+        {"request_id": "r1", "user_id": USER_ID, "status": "success", "timestamp": "t1"},
     ]
     repo._search_records.find.return_value = cursor
     results = repo.find_all_search_records(limit=10, skip=0)
@@ -69,7 +71,7 @@ def test_count_search_records(repo):
 
 
 def test_save_collection_record(repo):
-    record = CollectionRecord(record_id="c1", release_id=123)
+    record = CollectionRecord(record_id="c1", user_id=USER_ID, release_id=123)
     repo.save_collection_record(record)
     repo._collection_records.replace_one.assert_called_once()
 
@@ -78,21 +80,24 @@ def test_save_collection_record(repo):
 
 
 def test_save_batch(repo):
-    batch = Batch(batch_id="b1", total_images=5)
+    batch = Batch(batch_id="b1", user_id=USER_ID, total_images=5)
     repo.save_batch(batch)
     repo._batches.replace_one.assert_called_once()
 
 
 def test_find_batch_found(repo):
-    repo._batches.find_one.return_value = {"batch_id": "b1", "status": "processing"}
-    result = repo.find_batch("b1")
+    repo._batches.find_one.return_value = {"batch_id": "b1", "user_id": USER_ID, "status": "processing"}
+    result = repo.find_batch("b1", USER_ID)
     assert result is not None
     assert result.batch_id == "b1"
+    repo._batches.find_one.assert_called_once_with(
+        {"batch_id": "b1", "user_id": USER_ID}, {"_id": 0}
+    )
 
 
 def test_find_batch_not_found(repo):
     repo._batches.find_one.return_value = None
-    assert repo.find_batch("nope") is None
+    assert repo.find_batch("nope", USER_ID) is None
 
 
 def test_update_batch_status(repo):
@@ -120,28 +125,31 @@ def test_increment_batch_failed(repo):
 
 
 def test_save_item(repo):
-    item = BatchItem(item_id="i1", batch_id="b1")
+    item = BatchItem(item_id="i1", batch_id="b1", user_id=USER_ID)
     repo.save_item(item)
     repo._items.replace_one.assert_called_once()
 
 
 def test_find_item_found(repo):
-    repo._items.find_one.return_value = {"item_id": "i1", "batch_id": "b1"}
-    result = repo.find_item("i1")
+    repo._items.find_one.return_value = {"item_id": "i1", "batch_id": "b1", "user_id": USER_ID}
+    result = repo.find_item("i1", USER_ID)
     assert result is not None
     assert result.item_id == "i1"
+    repo._items.find_one.assert_called_once_with(
+        {"item_id": "i1", "user_id": USER_ID}, {"_id": 0}
+    )
 
 
 def test_find_item_not_found(repo):
     repo._items.find_one.return_value = None
-    assert repo.find_item("nope") is None
+    assert repo.find_item("nope", USER_ID) is None
 
 
 def test_find_items_by_batch(repo):
     cursor = MagicMock()
-    cursor.sort.return_value = [{"item_id": "i1", "batch_id": "b1"}]
+    cursor.sort.return_value = [{"item_id": "i1", "batch_id": "b1", "user_id": USER_ID}]
     repo._items.find.return_value = cursor
-    results = repo.find_items_by_batch("b1")
+    results = repo.find_items_by_batch("b1", USER_ID)
     assert len(results) == 1
 
 
@@ -149,16 +157,17 @@ def test_find_items_by_batch_with_review_filter(repo):
     cursor = MagicMock()
     cursor.sort.return_value = []
     repo._items.find.return_value = cursor
-    repo.find_items_by_batch("b1", review_status="accepted")
+    repo.find_items_by_batch("b1", USER_ID, review_status="accepted")
     query = repo._items.find.call_args[0][0]
     assert query["review_status"] == "accepted"
+    assert query["user_id"] == USER_ID
 
 
 def test_find_all_items(repo):
     cursor = MagicMock()
-    cursor.sort.return_value = [{"item_id": "i1", "batch_id": "b1"}]
+    cursor.sort.return_value = [{"item_id": "i1", "batch_id": "b1", "user_id": USER_ID}]
     repo._items.find.return_value = cursor
-    results = repo.find_all_items()
+    results = repo.find_all_items(USER_ID)
     assert len(results) == 1
 
 
@@ -166,9 +175,10 @@ def test_find_all_items_with_filter(repo):
     cursor = MagicMock()
     cursor.sort.return_value = []
     repo._items.find.return_value = cursor
-    repo.find_all_items(review_status="skipped")
+    repo.find_all_items(USER_ID, review_status="skipped")
     query = repo._items.find.call_args[0][0]
     assert query["review_status"] == "skipped"
+    assert query["user_id"] == USER_ID
 
 
 def test_update_item_status(repo):
@@ -222,8 +232,8 @@ def test_upsert_collection_items_bulk(repo):
     from repository.models import CollectionItem
 
     items = [
-        CollectionItem(instance_id=1, release_id=10, title="A"),
-        CollectionItem(instance_id=2, release_id=20, title="B"),
+        CollectionItem(user_id=USER_ID, instance_id=1, release_id=10, title="A"),
+        CollectionItem(user_id=USER_ID, instance_id=2, release_id=20, title="B"),
     ]
     mock_result = MagicMock()
     mock_result.upserted_count = 1
@@ -234,17 +244,18 @@ def test_upsert_collection_items_bulk(repo):
 
 
 def test_find_collection_items_default(repo):
-    from repository.models import CollectionItem
-
     cursor = MagicMock()
     cursor.sort.return_value = cursor
     cursor.skip.return_value = cursor
     cursor.limit.return_value = [
-        {"instance_id": 1, "release_id": 10, "title": "A", "artist": "X"},
+        {"user_id": USER_ID, "instance_id": 1, "release_id": 10, "title": "A", "artist": "X"},
     ]
     repo._collection_items.find.return_value = cursor
-    results = repo.find_collection_items()
+    results = repo.find_collection_items(USER_ID)
     assert len(results) == 1
+    # Verify user_id filter
+    filt = repo._collection_items.find.call_args[0][0]
+    assert filt["user_id"] == USER_ID
     # Default sort is artist asc with secondary year
     cursor.sort.assert_called_once()
     sort_arg = cursor.sort.call_args[0][0]
@@ -258,9 +269,10 @@ def test_find_collection_items_with_query_and_sort(repo):
     cursor.skip.return_value = cursor
     cursor.limit.return_value = []
     repo._collection_items.find.return_value = cursor
-    repo.find_collection_items(query="miles", sort="year", sort_order="desc", skip=10, limit=25)
+    repo.find_collection_items(USER_ID, query="miles", sort="year", sort_order="desc", skip=10, limit=25)
     filt = repo._collection_items.find.call_args[0][0]
     assert "$text" in filt
+    assert filt["user_id"] == USER_ID
     sort_arg = cursor.sort.call_args[0][0]
     assert sort_arg[0] == ("year", -1)
     # No secondary sort for non-artist
@@ -269,22 +281,26 @@ def test_find_collection_items_with_query_and_sort(repo):
 
 def test_count_collection_items_no_query(repo):
     repo._collection_items.count_documents.return_value = 50
-    assert repo.count_collection_items() == 50
-    repo._collection_items.count_documents.assert_called_once_with({})
+    assert repo.count_collection_items(USER_ID) == 50
+    filt = repo._collection_items.count_documents.call_args[0][0]
+    assert filt == {"user_id": USER_ID}
 
 
 def test_count_collection_items_with_query(repo):
     repo._collection_items.count_documents.return_value = 5
-    assert repo.count_collection_items(query="jazz") == 5
+    assert repo.count_collection_items(USER_ID, query="jazz") == 5
     filt = repo._collection_items.count_documents.call_args[0][0]
     assert "$text" in filt
+    assert filt["user_id"] == USER_ID
 
 
 def test_delete_stale_items(repo):
     mock_result = MagicMock()
     mock_result.deleted_count = 3
     repo._collection_items.delete_many.return_value = mock_result
-    assert repo.delete_stale_items("2024-01-01T00:00:00Z") == 3
+    assert repo.delete_stale_items(USER_ID, "2024-01-01T00:00:00Z") == 3
+    filt = repo._collection_items.delete_many.call_args[0][0]
+    assert filt["user_id"] == USER_ID
 
 
 # ── Sync status ─────────────────────────────────────────────────────────────
@@ -292,19 +308,20 @@ def test_delete_stale_items(repo):
 
 def test_get_sync_status_exists(repo):
     repo._sync_status.find_one.return_value = {"status": "syncing", "total_items": 10}
-    result = repo.get_sync_status()
+    result = repo.get_sync_status(USER_ID)
     assert result["status"] == "syncing"
+    repo._sync_status.find_one.assert_called_once_with({"_id": USER_ID}, {"_id": 0})
 
 
 def test_get_sync_status_missing(repo):
     repo._sync_status.find_one.return_value = None
-    assert repo.get_sync_status() == {"status": "idle"}
+    assert repo.get_sync_status(USER_ID) == {"status": "idle"}
 
 
 def test_update_sync_status(repo):
-    repo.update_sync_status({"status": "syncing"})
+    repo.update_sync_status(USER_ID, {"status": "syncing"})
     call = repo._sync_status.update_one.call_args
-    assert call[0][0] == {"_id": "collection"}
+    assert call[0][0] == {"_id": USER_ID}
     assert call[0][1] == {"$set": {"status": "syncing"}}
     assert call[1]["upsert"] is True
 
@@ -316,9 +333,10 @@ def test_find_all_items_with_status_filter(repo):
     cursor = MagicMock()
     cursor.sort.return_value = []
     repo._items.find.return_value = cursor
-    repo.find_all_items(status="completed")
+    repo.find_all_items(USER_ID, status="completed")
     query = repo._items.find.call_args[0][0]
     assert query["status"] == "completed"
+    assert query["user_id"] == USER_ID
 
 
 # ── LLM usage ───────────────────────────────────────────────────────────────
@@ -327,7 +345,7 @@ def test_find_all_items_with_status_filter(repo):
 def test_save_llm_usage(repo):
     from repository.models import LLMUsageRecord
 
-    record = LLMUsageRecord(record_id="u1", operation="vision", model="gpt-4")
+    record = LLMUsageRecord(record_id="u1", user_id=USER_ID, operation="vision", model="gpt-4")
     repo.save_llm_usage(record)
     repo._llm_usage.replace_one.assert_called_once()
     call_args = repo._llm_usage.replace_one.call_args
@@ -341,7 +359,7 @@ def test_get_usage_summary(repo):
         "by_model": [{"_id": "gpt-4", "requests": 5, "cost_usd": 0.05}],
         "by_operation": [{"_id": "vision", "requests": 5, "tokens": 1000, "cost_usd": 0.05}],
     }]
-    result = repo.get_usage_summary(days=7)
+    result = repo.get_usage_summary(USER_ID, days=7)
     assert result["period_days"] == 7
     assert result["totals"]["total_calls"] == 5
     assert len(result["by_day"]) == 1
@@ -351,7 +369,7 @@ def test_get_usage_summary(repo):
 
 def test_get_usage_summary_empty(repo):
     repo._llm_usage.aggregate.return_value = []
-    result = repo.get_usage_summary()
+    result = repo.get_usage_summary(USER_ID)
     assert result["totals"] == {}
     assert result["by_day"] == []
 
@@ -363,5 +381,38 @@ def test_get_usage_summary_no_totals(repo):
         "by_model": [],
         "by_operation": [],
     }]
-    result = repo.get_usage_summary()
+    result = repo.get_usage_summary(USER_ID)
     assert result["totals"]["total_calls"] == 0
+
+
+# ── OAuth tokens ────────────────────────────────────────────────────────────
+
+
+def test_save_oauth_tokens(repo):
+    repo.save_oauth_tokens(USER_ID, "at", "ats", "testuser")
+    repo._db["oauth_tokens"].replace_one.assert_called_once()
+    call_args = repo._db["oauth_tokens"].replace_one.call_args
+    assert call_args[0][0] == {"_id": USER_ID}
+    doc = call_args[0][1]
+    assert doc["access_token"] == "at"
+    assert doc["username"] == "testuser"
+
+
+def test_load_oauth_tokens_found(repo):
+    repo._db["oauth_tokens"].find_one.return_value = {
+        "_id": USER_ID, "access_token": "at", "access_token_secret": "ats", "username": "u",
+    }
+    result = repo.load_oauth_tokens(USER_ID)
+    assert result is not None
+    assert result["access_token"] == "at"
+    repo._db["oauth_tokens"].find_one.assert_called_once_with({"_id": USER_ID})
+
+
+def test_load_oauth_tokens_not_found(repo):
+    repo._db["oauth_tokens"].find_one.return_value = None
+    assert repo.load_oauth_tokens(USER_ID) is None
+
+
+def test_delete_oauth_tokens(repo):
+    repo.delete_oauth_tokens(USER_ID)
+    repo._db["oauth_tokens"].delete_one.assert_called_once_with({"_id": USER_ID})

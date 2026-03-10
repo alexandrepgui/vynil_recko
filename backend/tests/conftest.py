@@ -1,19 +1,57 @@
 """Shared fixtures for the backend test suite."""
 
 import json
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import jwt as pyjwt
 import pytest
 
+from auth import User, get_current_user
 from services.llm.base import LLMResponse
+
+# JWT test constants
+JWT_SECRET = "test-secret-key"
+TEST_USER_ID = "test-user-123"
+TEST_USER_EMAIL = "test@example.com"
 
 
 @pytest.fixture(autouse=True, scope="session")
 def _mock_lifespan_repo():
     """Prevent the app lifespan from connecting to a real MongoDB."""
-    with patch("main.get_repo", return_value=MagicMock()):
-        yield
+    # No-op: lifespan no longer restores OAuth tokens
+    yield
+
+
+@pytest.fixture()
+def mock_jwt_user():
+    """Override get_current_user to return a test user (no real JWT needed)."""
+    from main import app
+
+    test_user = User(id=TEST_USER_ID, email=TEST_USER_EMAIL)
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    yield test_user
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def make_jwt_token(user_id=TEST_USER_ID, email=TEST_USER_EMAIL, secret=JWT_SECRET):
+    """Create a valid JWT token for testing."""
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "aud": "authenticated",
+        "exp": int(time.time()) + 3600,
+        "iat": int(time.time()),
+    }
+    return pyjwt.encode(payload, secret, algorithm="HS256")
+
+
+def jwt_headers(user_id=TEST_USER_ID, email=TEST_USER_EMAIL, secret=JWT_SECRET):
+    """Return Authorization headers with a valid JWT for testing."""
+    token = make_jwt_token(user_id, email, secret)
+    return {"Authorization": f"Bearer {token}"}
+
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
@@ -76,6 +114,8 @@ def mock_repo():
         repo.saved_records.append(record)
 
     repo.save_search_record.side_effect = capture_save
+    # Return None for oauth token lookups by default (no Discogs connection)
+    repo.load_oauth_tokens.return_value = None
     return repo
 
 

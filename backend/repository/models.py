@@ -10,6 +10,7 @@ from uuid import uuid4
 class SearchRecord:
     request_id: str = field(default_factory=lambda: str(uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    user_id: str = ""
     status: str = "pending"
     image_filename: str | None = None
     image_size_bytes: int | None = None
@@ -26,6 +27,7 @@ class SearchRecord:
         return cls(
             request_id=data.get("request_id", str(uuid4())),
             timestamp=data.get("timestamp", ""),
+            user_id=data.get("user_id", ""),
             status=data.get("status", "pending"),
             image_filename=data.get("image_filename"),
             image_size_bytes=data.get("image_size_bytes"),
@@ -39,7 +41,7 @@ class SearchRecord:
 @dataclass
 class Batch:
     batch_id: str = field(default_factory=lambda: str(uuid4()))
-    user_id: str = "local-user"
+    user_id: str = ""
     status: str = "processing"  # processing | completed | failed
     total_images: int = 0
     processed: int = 0
@@ -54,7 +56,7 @@ class Batch:
     def from_dict(cls, data: dict) -> Batch:
         return cls(
             batch_id=data.get("batch_id", str(uuid4())),
-            user_id=data.get("user_id", "local-user"),
+            user_id=data.get("user_id", ""),
             status=data.get("status", "processing"),
             total_images=data.get("total_images", 0),
             processed=data.get("processed", 0),
@@ -68,6 +70,7 @@ class Batch:
 class BatchItem:
     item_id: str = field(default_factory=lambda: str(uuid4()))
     batch_id: str = ""
+    user_id: str = ""
     image_filename: str = ""
     status: str = "pending"  # pending | processing | completed | error
     error: str | None = None
@@ -89,6 +92,7 @@ class BatchItem:
         return cls(
             item_id=data.get("item_id", str(uuid4())),
             batch_id=data.get("batch_id", ""),
+            user_id=data.get("user_id", ""),
             image_filename=data.get("image_filename", ""),
             status=data.get("status", "pending"),
             error=data.get("error"),
@@ -108,6 +112,7 @@ class BatchItem:
 class LLMUsageRecord:
     record_id: str = field(default_factory=lambda: str(uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    user_id: str = ""
     provider: str = ""  # openrouter | google
     model: str = ""  # e.g. "google/gemini-2.5-flash"
     operation: str = ""  # label_reading | ranking
@@ -127,6 +132,7 @@ class LLMUsageRecord:
         return cls(
             record_id=data.get("record_id", str(uuid4())),
             timestamp=data.get("timestamp", ""),
+            user_id=data.get("user_id", ""),
             provider=data.get("provider", ""),
             model=data.get("model", ""),
             operation=data.get("operation", ""),
@@ -143,6 +149,7 @@ class LLMUsageRecord:
 @dataclass
 class CollectionItem:
     """A single release in the user's Discogs collection (persisted locally)."""
+    user_id: str = ""
     instance_id: int = 0
     release_id: int = 0
     title: str = ""
@@ -161,6 +168,7 @@ class CollectionItem:
     @classmethod
     def from_dict(cls, data: dict) -> CollectionItem:
         return cls(
+            user_id=data.get("user_id", ""),
             instance_id=data.get("instance_id", 0),
             release_id=data.get("release_id", 0),
             title=data.get("title", ""),
@@ -179,6 +187,7 @@ class CollectionItem:
 class CollectionRecord:
     record_id: str = field(default_factory=lambda: str(uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    user_id: str = ""
     status: str = "pending"
     release_id: int | None = None
     username: str | None = None
@@ -194,6 +203,7 @@ class CollectionRecord:
         return cls(
             record_id=data.get("record_id", str(uuid4())),
             timestamp=data.get("timestamp", ""),
+            user_id=data.get("user_id", ""),
             status=data.get("status", "pending"),
             release_id=data.get("release_id"),
             username=data.get("username"),
