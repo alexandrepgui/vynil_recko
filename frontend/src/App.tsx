@@ -1,19 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import './App.css';
 import { searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
+import { AuthProvider, useAuth } from './AuthContext';
 import DiscogsAuth from './components/DiscogsAuth';
 import ImageUpload from './components/ImageUpload';
+import LoginPage from './components/LoginPage';
+import MediaTypeSelector from './components/MediaTypeSelector';
 import ResultsList from './components/ResultsList';
 import BatchView from './components/BatchView';
 import ReviewView from './components/ReviewView';
 import IssuesView from './components/IssuesView';
 import CollectionView from './components/CollectionView';
+import vinylIcon from './assets/vinyl.svg';
+import cdIcon from './assets/cd.svg';
+import singleSearchIcon from './assets/single-search.svg';
+import batchIcon from './assets/batch.svg';
+import reviewIcon from './assets/review.svg';
+import issuesIcon from './assets/issues.svg';
+import collectionIcon from './assets/collection.svg';
 
-const ROUTES_WITHOUT_MEDIA_TOGGLE = ['review', 'issues', 'collection'];
-
-function SingleSearchPage({ mediaType }: { mediaType: MediaType }) {
+function SingleSearchPage() {
+  const [mediaType, setMediaType] = useState<MediaType | null>(null);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +31,7 @@ function SingleSearchPage({ mediaType }: { mediaType: MediaType }) {
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   const handleFileSelected = async (file: File) => {
+    if (!mediaType) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -52,8 +62,28 @@ function SingleSearchPage({ mediaType }: { mediaType: MediaType }) {
     setError(null);
   };
 
+  const handleChangeType = () => {
+    abortRef.current?.abort();
+    setMediaType(null);
+    setResponse(null);
+    setError(null);
+    setIsLoading(false);
+  };
+
+  if (!mediaType) {
+    return <MediaTypeSelector onSelect={setMediaType} />;
+  }
+
   return (
     <>
+      <div className="media-selected-bar">
+        <div className="media-selected-info">
+          <img src={mediaType === 'cd' ? cdIcon : vinylIcon} alt="" className="media-selected-icon" />
+          <span>{mediaType === 'cd' ? 'CD' : 'Vinyl'}</span>
+        </div>
+        <button className="btn-change-media" onClick={handleChangeType}>Change</button>
+      </div>
+
       <ImageUpload
         onFileSelected={handleFileSelected}
         onClear={handleClear}
@@ -86,62 +116,65 @@ function SingleSearchPage({ mediaType }: { mediaType: MediaType }) {
 }
 
 function AppInner() {
-  const [mediaType, setMediaType] = useState<MediaType>('vinyl');
-  const location = useLocation();
   const navigate = useNavigate();
-  const showMediaToggle = !ROUTES_WITHOUT_MEDIA_TOGGLE.some(
-    (p) => location.pathname.startsWith(`/${p}`)
-  );
+  const { user, loading, signOut } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading"><div className="spinner" /></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <div className="app">
       <nav className="mode-tabs">
         <NavLink to="/" end className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={singleSearchIcon} alt="" className="tab-icon" />
           Single Search
         </NavLink>
         <NavLink to="/batch" className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={batchIcon} alt="" className="tab-icon" />
           Batch
         </NavLink>
         <NavLink to="/review" className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={reviewIcon} alt="" className="tab-icon" />
           Review
         </NavLink>
         <NavLink to="/issues" className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={issuesIcon} alt="" className="tab-icon" />
           Issues
         </NavLink>
         <NavLink to="/collection" className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={collectionIcon} alt="" className="tab-icon" />
           Collection
         </NavLink>
       </nav>
 
       <header className="app-header">
-        <h1>Groove Log</h1>
-        <p>Drop a {mediaType === 'cd' ? 'CD' : 'record label'} photo to identify your {mediaType === 'cd' ? 'CD' : 'vinyl'}</p>
+        <div className="header-top">
+          <h1>Groove Log</h1>
+          <div className="header-user">
+            <span className="user-email">{user.email}</span>
+            <button className="btn btn-sign-out" onClick={signOut}>Sign Out</button>
+          </div>
+        </div>
+        <p>Identify your records by photo</p>
         <DiscogsAuth />
       </header>
 
-      {showMediaToggle && (
-        <div className="media-type-toggle">
-          <button
-            className={`media-type-btn ${mediaType === 'vinyl' ? 'active' : ''}`}
-            onClick={() => setMediaType('vinyl')}
-          >
-            Vinyl
-          </button>
-          <button
-            className={`media-type-btn ${mediaType === 'cd' ? 'active' : ''}`}
-            onClick={() => setMediaType('cd')}
-          >
-            CD
-          </button>
-        </div>
-      )}
-
       <Routes>
-        <Route path="/" element={<SingleSearchPage mediaType={mediaType} />} />
-        <Route path="/batch" element={<BatchView onGoToReview={() => navigate('/review')} mediaType={mediaType} />} />
+        <Route path="/" element={<SingleSearchPage />} />
+        <Route path="/batch" element={<BatchView onGoToReview={() => navigate('/review')} />} />
         <Route path="/review" element={<ReviewView />} />
         <Route path="/issues" element={<IssuesView />} />
         <Route path="/collection" element={<CollectionView />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
@@ -150,7 +183,9 @@ function AppInner() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppInner />
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
     </BrowserRouter>
   );
 }
