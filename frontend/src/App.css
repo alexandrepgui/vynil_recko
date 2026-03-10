@@ -3,8 +3,12 @@
   max-width: 860px;
   margin: 0 auto;
   padding: 2rem 1rem;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #1a1a1a;
+}
+
+h2, h3 {
+  font-family: 'Noto Serif Display', Georgia, serif;
 }
 
 .app-header {
@@ -12,8 +16,32 @@
   margin-bottom: 2rem;
 }
 
-.app-header h1 {
-  font-size: 2rem;
+.app-header p {
+  font-family: 'Noto Serif Display', Georgia, serif;
+}
+
+.app-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0 0 0.25rem;
+}
+
+.app-icon {
+  height: 5rem;
+  width: auto;
+}
+
+.app-logo {
+  height: 4rem;
+}
+
+.app-header h1,
+.app-title {
+  font-family: 'Ranchers', sans-serif;
+  font-size: 4rem;
+  font-weight: 400;
   margin: 0 0 0.25rem;
 }
 
@@ -213,7 +241,7 @@
 .result-price {
   background: #e8f5e9 !important;
   color: #2e7d32 !important;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* Buttons */
@@ -227,7 +255,7 @@
   padding: 0.4rem 0.85rem;
   border-radius: 6px;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 400;
   text-decoration: none;
   border: none;
   cursor: pointer;
@@ -283,7 +311,7 @@
   margin-bottom: -2px;
   cursor: pointer;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #888;
   text-decoration: none;
   text-align: center;
@@ -358,7 +386,7 @@
 
 .media-selector-title {
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #1a1a1a;
 }
 
@@ -385,7 +413,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #333;
 }
 
@@ -403,7 +431,7 @@
   background: #fff;
   color: #555;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -492,7 +520,7 @@
 }
 
 .batch-review-filename {
-  font-weight: 600;
+  font-weight: 400;
   color: #444;
 }
 
@@ -582,7 +610,7 @@
 .btn-nav {
   background: #e3f2fd;
   color: #1565c0;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .btn-nav:hover {
@@ -597,7 +625,7 @@
 .result-acted-label,
 .batch-review-acted {
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #888;
 }
 
@@ -694,7 +722,7 @@
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .debug-badge-hit {
@@ -825,7 +853,7 @@
 }
 
 .issues-card-filename {
-  font-weight: 600;
+  font-weight: 400;
   font-size: 0.9rem;
   color: #333;
 }
@@ -941,7 +969,7 @@
 
 .collection-card-title {
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 400;
   color: #333;
   white-space: nowrap;
   overflow: hidden;
@@ -1057,7 +1085,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: #f5f5f5;
 }
 
@@ -1072,7 +1100,9 @@
 }
 
 .login-card h1 {
-  font-size: 1.8rem;
+  font-family: 'Ranchers', sans-serif;
+  font-size: 3.5rem;
+  font-weight: 400;
   margin: 0 0 0.25rem;
   color: #1a1a1a;
 }
@@ -1136,7 +1166,7 @@
   border: none;
   border-radius: 6px;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1174,7 +1204,7 @@
   border-radius: 6px;
   background: #fff;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
   color: #333;
   transition: background 0.15s;

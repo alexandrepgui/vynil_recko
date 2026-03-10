@@ -21,6 +21,8 @@ import reviewIcon from './assets/review.svg';
 import issuesIcon from './assets/issues.svg';
 import collectionIcon from './assets/collection.svg';
 import profileIcon from './assets/profile.svg';
+import logoImg from './assets/logo.svg';
+import logoIcon from './assets/icon.svg';
 
 function SingleSearchPage() {
   const [mediaType, setMediaType] = useState<MediaType | null>(null);
@@ -170,7 +172,10 @@ function AppInner() {
       </nav>
 
       <header className="app-header">
-        <h1>Groove Log</h1>
+        <div className="app-logo-row">
+          <img src={logoIcon} alt="" className="app-icon" />
+          <img src={logoImg} alt="groove log" className="app-logo" />
+        </div>
         <p>Identify your records by photo</p>
       </header>
 
