@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getDiscogsStatus, discogsLogout, startDiscogsLogin } from '../api';
 import type { DiscogsStatus } from '../types';
+import { isValidDiscogsUrl } from '../utils';
 
 export default function DiscogsAuth() {
   const [status, setStatus] = useState<DiscogsStatus | null>(null);
@@ -29,6 +30,11 @@ export default function DiscogsAuth() {
     setError(null);
     try {
       const authorizeUrl = await startDiscogsLogin();
+      if (!isValidDiscogsUrl(authorizeUrl)) {
+        setError('Something went wrong with Discogs authentication. Try again?');
+        setLoading(false);
+        return;
+      }
       window.location.href = authorizeUrl;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start login');

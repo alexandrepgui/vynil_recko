@@ -3,6 +3,7 @@ import { discogsLogout, getProfile, getSettings, startDiscogsLogin, updateSettin
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
 import type { UserProfile, UserSettings } from '../types';
+import { isValidDiscogsUrl } from '../utils';
 
 const AVATAR_SIZE = 256;
 const AVATAR_QUALITY = 0.85;
@@ -138,6 +139,11 @@ export default function ProfilePage() {
     setError(null);
     try {
       const authorizeUrl = await startDiscogsLogin();
+      if (!isValidDiscogsUrl(authorizeUrl)) {
+        setError('Something went wrong with Discogs authentication. Try again?');
+        setDiscogsLoading(false);
+        return;
+      }
       window.location.href = authorizeUrl;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start Discogs login');
