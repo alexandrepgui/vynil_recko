@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { discogsLogout, getProfile, startDiscogsLogin } from '../api';
+import { discogsLogout, getProfile, getSettings, startDiscogsLogin, updateSettings } from '../api';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
-import type { UserProfile } from '../types';
+import type { UserProfile, UserSettings } from '../types';
 
 const AVATAR_SIZE = 256;
 const AVATAR_QUALITY = 0.85;
@@ -10,7 +10,10 @@ const AVATAR_QUALITY = 0.85;
 function resizeImage(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
     img.onload = () => {
+      cleanup();
       const canvas = document.createElement('canvas');
       canvas.width = AVATAR_SIZE;
       canvas.height = AVATAR_SIZE;
@@ -28,8 +31,8 @@ function resizeImage(file: File): Promise<Blob> {
         AVATAR_QUALITY,
       );
     };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { cleanup(); reject(new Error('Failed to load image')); };
+    img.src = objectUrl;
   });
 }
 
@@ -39,6 +42,8 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [discogsLoading, setDiscogsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProfile = useCallback(async () => {
@@ -49,9 +54,19 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      setSettings(await getSettings());
+    } catch {
+      // Settings not available, use defaults
+      setSettings({ collection_public: false });
+    }
+  }, []);
+
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    fetchSettings();
+  }, [fetchProfile, fetchSettings]);
 
   if (!profile && !error) {
     return (
@@ -130,6 +145,20 @@ export default function ProfilePage() {
     }
   };
 
+  const handleToggleVisibility = async () => {
+    if (!settings) return;
+    setSettingsLoading(true);
+    setError(null);
+    try {
+      const updated = await updateSettings({ collection_public: !settings.collection_public });
+      setSettings(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update settings');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   const p = profile!;
   const avatarUrl = p.avatar_url;
 
@@ -196,6 +225,29 @@ export default function ProfilePage() {
           )}
         </div>
       )}
+
+      <div className="profile-section">
+        <h3 className="profile-section-title">Collection</h3>
+        <div className="profile-visibility-row">
+          <div className="profile-visibility-info">
+            <span className="profile-visibility-label">Collection visibility</span>
+            <span className="profile-visibility-hint">
+              When public, anyone can view your collection at /collection/{p.discogs?.username || 'your-username'}
+            </span>
+          </div>
+          <button
+            className={`toggle-switch${settings?.collection_public ? ' toggle-on' : ''}`}
+            onClick={handleToggleVisibility}
+            disabled={settingsLoading}
+            aria-label="Toggle collection visibility"
+          >
+            <span className="toggle-knob" />
+          </button>
+        </div>
+        <span className="profile-visibility-status">
+          {settings?.collection_public ? 'Public' : 'Private'}
+        </span>
+      </div>
 
       {error && <p className="error">{error}</p>}
 

@@ -1,9 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCollection, getCollectionSyncStatus, triggerCollectionSync } from '../api';
+import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getProfile, getPublicCollection, getSettings, triggerCollectionSync } from '../api';
 import type { CollectionItem, SyncStatus } from '../types';
 import ZoomableImage from './ZoomableImage';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 150, 200, 250];
+const PAGE_SIZE_KEY = 'groove-log-page-size';
+
+function loadPageSize(): number {
+  try {
+    const stored = localStorage.getItem(PAGE_SIZE_KEY);
+    if (stored) {
+      const n = Number(stored);
+      if (PAGE_SIZE_OPTIONS.includes(n)) return n;
+    }
+  } catch { /* ignore */ }
+  return 50;
+}
+
+/**
+ * Given `itemCount` items and a maximum number of columns that fit,
+ * return the column count (>= 1) that minimises empty cells in the last row.
+ * Prefer fewer empty cells; on ties, prefer more columns.
+ */
+function computeOptimalColumns(itemCount: number, maxCols: number): number {
+  if (itemCount <= 0 || maxCols <= 0) return maxCols || 1;
+  let best = maxCols;
+  let bestEmpty = maxCols; // worst case
+  for (let cols = maxCols; cols >= 1; cols--) {
+    const remainder = itemCount % cols;
+    const empty = remainder === 0 ? 0 : cols - remainder;
+    if (empty < bestEmpty) {
+      bestEmpty = empty;
+      best = cols;
+    }
+    if (bestEmpty === 0) break;
+  }
+  return best;
+}
 
 const SORT_OPTIONS = [
   { value: 'artist', label: 'Artist' },
@@ -13,7 +46,12 @@ const SORT_OPTIONS = [
   { value: 'format', label: 'Format' },
 ];
 
-export default function CollectionView() {
+interface CollectionViewProps {
+  readOnly?: boolean;
+  username?: string;
+}
+
+export default function CollectionView({ readOnly = false, username }: CollectionViewProps) {
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -23,58 +61,124 @@ export default function CollectionView() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(loadPageSize);
+  const [gridColumns, setGridColumns] = useState<number | null>(null);
+
+  // Public collection owner info
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+
+  // Selection state (only used when not readOnly)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+
+  // Copy link state (only used in authenticated view)
+  const [collectionPublic, setCollectionPublic] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [discogsUsername, setDiscogsUsername] = useState<string | null>(null);
 
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Debounced search value actually sent to the API
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   // Check sync status on mount to decide what to show
   useEffect(() => {
-    getCollectionSyncStatus()
-      .then((s) => {
-        setSyncStatus(s);
-        // If a sync is in progress, start polling
-        if (s.status === 'syncing') startPolling();
-      })
-      .catch(() => setSyncStatus({ status: 'idle' }))
-      .finally(() => setInitialCheckDone(true));
+    if (readOnly && username) {
+      // Public view: skip sync check, load directly
+      setInitialCheckDone(true);
+      return;
+    }
+    Promise.all([
+      getCollectionSyncStatus().catch(() => ({ status: 'idle' }) as SyncStatus),
+      getSettings().catch(() => ({ collection_public: false })),
+      getProfile().catch(() => null),
+    ]).then(([s, settings, profile]) => {
+      setSyncStatus(s);
+      if (s.status === 'syncing') startPolling();
+      setCollectionPublic(settings.collection_public);
+      if (profile) setDiscogsUsername(profile.discogs.username ?? null);
+      setInitialCheckDone(true);
+    });
+
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [readOnly, username]);
 
-  const hasSynced = syncStatus?.completed_at != null;
-  const isSyncing = syncStatus?.status === 'syncing';
+  const hasSynced = readOnly ? true : syncStatus?.completed_at != null;
+  const isSyncing = readOnly ? false : syncStatus?.status === 'syncing';
 
   // Fetch from local DB
   const fetchCollection = useCallback(
-    async (p: number, s: string, so: string, q: string) => {
+    async (p: number, ps: number, s: string, so: string, q: string) => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getCollection(p, PAGE_SIZE, s, so, q);
+        const data = readOnly && username
+          ? await getPublicCollection(username, p, ps, s, so, q)
+          : await getCollection(p, ps, s, so, q);
         setItems(data.items);
         setPage(data.page);
         setPages(data.pages);
         setTotalItems(data.total_items);
+        if ('owner' in data) setOwnerName(data.owner.username);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load collection.');
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [readOnly, username],
   );
 
   // Load collection when ready and when params change
   useEffect(() => {
     if (!hasSynced || isSyncing) return;
-    fetchCollection(page, sort, sortOrder, debouncedSearch);
-  }, [hasSynced, isSyncing, page, sort, sortOrder, debouncedSearch, fetchCollection]);
+    fetchCollection(page, pageSize, sort, sortOrder, debouncedSearch);
+  }, [hasSynced, isSyncing, page, pageSize, sort, sortOrder, debouncedSearch, fetchCollection]);
+
+  // Adaptive grid: compute optimal columns based on container width and item count
+  const itemCountRef = useRef(items.length);
+  itemCountRef.current = items.length;
+
+  const recalcColumns = useCallback(() => {
+    const container = gridRef.current;
+    if (!container || itemCountRef.current === 0) {
+      setGridColumns(null);
+      return;
+    }
+    const containerWidth = container.clientWidth;
+    const gap = 16; // 1rem gap
+    const preferredCardWidth = 180; // px
+    const maxCols = Math.max(1, Math.floor((containerWidth + gap) / (preferredCardWidth + gap)));
+    const optimal = computeOptimalColumns(itemCountRef.current, maxCols);
+    setGridColumns(optimal);
+  }, []);
+
+  useEffect(() => {
+    recalcColumns();
+    const handleResize = () => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = setTimeout(recalcColumns, 150);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    };
+  }, [recalcColumns]);
+
+  // Recalculate columns when item count changes
+  useEffect(() => {
+    recalcColumns();
+  }, [items.length, recalcColumns]);
 
   // Debounce search input
   useEffect(() => {
@@ -120,6 +224,12 @@ export default function CollectionView() {
     }
   };
 
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+    try { localStorage.setItem(PAGE_SIZE_KEY, String(newSize)); } catch { /* ignore */ }
+  };
+
   const handleSortChange = (newSort: string) => {
     setSort(newSort);
     setPage(1);
@@ -128,6 +238,56 @@ export default function CollectionView() {
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     setPage(1);
+  };
+
+  // Clear selection when page/search/sort changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, pageSize, sort, sortOrder, debouncedSearch]);
+
+  const toggleSelect = (instanceId: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(instanceId)) {
+        next.delete(instanceId);
+      } else {
+        next.add(instanceId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllPage = () => {
+    setSelectedIds(new Set(items.map((item) => item.instance_id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    setDeleting(true);
+    setDeleteMessage(null);
+    try {
+      const result = await deleteCollectionItems(Array.from(selectedIds));
+      const msgs: string[] = [];
+      if (result.deleted > 0) {
+        msgs.push(`${result.deleted} record${result.deleted !== 1 ? 's' : ''} deleted.`);
+      }
+      if (result.errors.length > 0) {
+        msgs.push(`${result.errors.length} failed.`);
+      }
+      setDeleteMessage(msgs.join(' '));
+      setSelectedIds(new Set());
+      setShowDeleteModal(false);
+      // Refresh the current page
+      fetchCollection(page, pageSize, sort, sortOrder, debouncedSearch);
+    } catch (e) {
+      setDeleteMessage(e instanceof Error ? e.message : 'Delete failed.');
+      setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (!initialCheckDone) {
@@ -140,8 +300,17 @@ export default function CollectionView() {
     );
   }
 
-  // Landing: never synced and not currently syncing
-  if (!hasSynced && !isSyncing) {
+  const handleCopyLink = () => {
+    if (!discogsUsername) return;
+    const url = `${window.location.origin}/collection/${discogsUsername}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
+
+  // Landing: never synced and not currently syncing (only for authenticated view)
+  if (!readOnly && !hasSynced && !isSyncing) {
     return (
       <div className="collection-view">
         <div className="collection-landing">
@@ -158,8 +327,8 @@ export default function CollectionView() {
     );
   }
 
-  // Syncing progress
-  if (isSyncing) {
+  // Syncing progress (only for authenticated view)
+  if (!readOnly && isSyncing) {
     const synced = syncStatus?.items_synced ?? 0;
     const total = syncStatus?.total_items ?? 0;
     return (
@@ -186,6 +355,10 @@ export default function CollectionView() {
   // Collection view (data loaded from MongoDB)
   return (
     <div className="collection-view">
+      {readOnly && ownerName && (
+        <h2 className="public-collection-owner">{ownerName}'s Collection</h2>
+      )}
+
       <div className="collection-controls">
         <input
           type="text"
@@ -210,17 +383,64 @@ export default function CollectionView() {
             {sortOrder === 'asc' ? '\u2191' : '\u2193'}
           </button>
         </div>
-        <button
-          className="btn collection-resync"
-          onClick={handleSync}
-          disabled={isSyncing}
-          title="Re-sync from Discogs"
+        <select
+          className="collection-page-size-select"
+          value={pageSize}
+          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          title="Items per page"
         >
-          Re-sync
-        </button>
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n} / page
+            </option>
+          ))}
+        </select>
+        {!readOnly && (
+          <button
+            className="btn collection-resync"
+            onClick={handleSync}
+            disabled={isSyncing}
+            title="Re-sync from Discogs"
+          >
+            Re-sync
+          </button>
+        )}
+        {!readOnly && collectionPublic && discogsUsername && (
+          <button
+            className="btn btn-copy-link"
+            onClick={handleCopyLink}
+            title="Copy public collection link"
+          >
+            {copySuccess ? 'Copied!' : 'Copy link'}
+          </button>
+        )}
       </div>
 
       {error && <p className="error">{error}</p>}
+
+      {!readOnly && deleteMessage && (
+        <p className="collection-delete-message">{deleteMessage}</p>
+      )}
+
+      {!readOnly && selectedIds.size > 0 && (
+        <div className="collection-selection-toolbar">
+          <span className="collection-selection-count">
+            {selectedIds.size} selected
+          </span>
+          <button className="btn btn-nav" onClick={selectAllPage}>
+            Select All (page)
+          </button>
+          <button className="btn btn-nav" onClick={deselectAll}>
+            Deselect All
+          </button>
+          <button
+            className="btn btn-delete-selected"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete Selected
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="loading">
@@ -240,9 +460,25 @@ export default function CollectionView() {
           <div className="collection-info">
             {totalItems} item{totalItems !== 1 ? 's' : ''} in collection
           </div>
-          <div className="collection-grid">
+          <div
+            className="collection-grid"
+            ref={gridRef}
+            style={gridColumns ? { gridTemplateColumns: `repeat(${gridColumns}, 1fr)` } : undefined}
+          >
             {items.map((item) => (
-              <div key={`${item.release_id}-${item.instance_id}`} className="collection-card">
+              <div
+                key={`${item.release_id}-${item.instance_id}`}
+                className={`collection-card${!readOnly && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
+              >
+                {!readOnly && (
+                  <label className="collection-card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.instance_id)}
+                      onChange={() => toggleSelect(item.instance_id)}
+                    />
+                  </label>
+                )}
                 {item.cover_image ? (
                   <ZoomableImage
                     src={item.cover_image}
@@ -290,6 +526,34 @@ export default function CollectionView() {
             </div>
           )}
         </>
+      )}
+
+      {!readOnly && showDeleteModal && (
+        <div className="delete-modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+            <p className="delete-modal-warning">
+              You are about to remove {selectedIds.size} record{selectedIds.size !== 1 ? 's' : ''} from
+              your collection. This will also delete them from your Discogs account.
+              This action cannot be undone.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                className="btn btn-nav"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-delete-confirm"
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

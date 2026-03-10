@@ -1,4 +1,3 @@
-import os
 import re
 import time
 from collections.abc import Generator
@@ -21,12 +20,9 @@ _RATE_LIMIT_THRESHOLD = 5
 _RATE_LIMIT_PAUSE = 5  # seconds
 
 
-def _headers(tokens: OAuthTokens | None = None) -> dict:
-    """Build auth headers: prefer explicit OAuth tokens, fall back to personal token."""
-    if tokens:
-        return build_oauth_headers(tokens)
-    token = os.getenv("DISCOGS_TOKEN")
-    return {"Authorization": f"Discogs token={token}"}
+def _headers(tokens: OAuthTokens) -> dict:
+    """Build auth headers from OAuth tokens."""
+    return build_oauth_headers(tokens)
 
 
 def _respect_rate_limit(resp: requests.Response) -> None:
@@ -46,7 +42,7 @@ def _respect_rate_limit(resp: requests.Response) -> None:
             time.sleep(_RATE_LIMIT_PAUSE)
 
 
-def discogs_search(tokens: OAuthTokens | None = None, max_pages: int = 10, **params) -> list[dict]:
+def discogs_search(tokens: OAuthTokens, max_pages: int = 10, **params) -> list[dict]:
     """Search Discogs with arbitrary params, paginating through all results."""
     params.setdefault("type", "release")
     params.setdefault("per_page", 50)
@@ -324,7 +320,7 @@ def score_by_metadata(releases: list[dict], label_meta: dict) -> list[dict]:
     return filtered
 
 
-def get_marketplace_stats(release_id: int, tokens: OAuthTokens | None = None) -> dict:
+def get_marketplace_stats(release_id: int, tokens: OAuthTokens) -> dict:
     """Fetch marketplace price stats for a release."""
     resp = _session.get(
         f"{DISCOGS_BASE_URL}/marketplace/stats/{release_id}",
@@ -335,7 +331,7 @@ def get_marketplace_stats(release_id: int, tokens: OAuthTokens | None = None) ->
     return resp.json()
 
 
-def get_identity(tokens: OAuthTokens | None = None) -> str:
+def get_identity(tokens: OAuthTokens) -> str:
     """Get the authenticated Discogs username via /oauth/identity."""
     resp = _session.get(
         f"{DISCOGS_BASE_URL}/oauth/identity",
@@ -347,7 +343,7 @@ def get_identity(tokens: OAuthTokens | None = None) -> str:
 
 
 def get_collection(
-    tokens: OAuthTokens | None = None,
+    tokens: OAuthTokens,
     page: int = 1,
     per_page: int = 50,
     sort: str = "artist",
@@ -371,7 +367,7 @@ def get_collection(
     return resp.json()
 
 
-def add_to_collection(release_id: int, tokens: OAuthTokens | None = None) -> dict:
+def add_to_collection(release_id: int, tokens: OAuthTokens) -> dict:
     """Add a release to the user's Discogs collection (Uncategorized folder)."""
     username = tokens.username if tokens and tokens.username else get_identity(tokens)
     log.info("Adding release %d to collection for user '%s'", release_id, username)
@@ -382,3 +378,20 @@ def add_to_collection(release_id: int, tokens: OAuthTokens | None = None) -> dic
     _respect_rate_limit(resp)
     resp.raise_for_status()
     return resp.json()
+
+
+def remove_from_collection(
+    release_id: int, instance_id: int, tokens: OAuthTokens,
+) -> None:
+    """Remove a specific instance of a release from the user's Discogs collection."""
+    username = tokens.username if tokens and tokens.username else get_identity(tokens)
+    log.info(
+        "Removing release %d instance %d from collection for user '%s'",
+        release_id, instance_id, username,
+    )
+    resp = _session.delete(
+        f"{DISCOGS_BASE_URL}/users/{username}/collection/folders/0/releases/{release_id}/instances/{instance_id}",
+        headers=_headers(tokens),
+    )
+    _respect_rate_limit(resp)
+    resp.raise_for_status()

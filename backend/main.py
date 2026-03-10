@@ -4,9 +4,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import UPLOADS_DIR
+from services.discogs_auth import DiscogsNotConnectedError
 from logger import get_logger, setup_logging
 from routes.discogs_oauth import router as discogs_router
 from routes.search import router as search_router
@@ -39,6 +41,11 @@ app.include_router(profile_router)
 
 UPLOADS_DIR.mkdir(exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
+
+@app.exception_handler(DiscogsNotConnectedError)
+async def discogs_not_connected_handler(_request: Request, exc: DiscogsNotConnectedError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.middleware("http")

@@ -12,7 +12,7 @@ from logger import get_logger
 from models import ItemStatus, MediaType, ReviewAction, ReviewStatus
 from repository import Batch, BatchItem, SearchRecord
 from repository.mongo import MongoRepository
-from services.discogs_auth import OAuthTokens, load_tokens_for_user
+from services.discogs_auth import OAuthTokens, require_discogs_tokens
 from services.search import process_single_image
 from services.vision import invalidate_cache
 from utils import save_upload_image
@@ -130,7 +130,7 @@ async def create_batch(
         task_items.append((item.item_id, img_bytes, content_type))
         filenames[item.item_id] = filename
 
-    tokens = load_tokens_for_user(repo, user.id)
+    tokens = require_discogs_tokens(repo, user.id)
     background_tasks.add_task(
         _process_batch, batch.batch_id, task_items, filenames, media_type,
         user_id=user.id, tokens=tokens,
@@ -281,7 +281,7 @@ async def retry_item(
     repo.update_item_status(item_id, ItemStatus.PENDING)
     repo.update_item_review(item_id, ReviewStatus.UNREVIEWED, None)
 
-    tokens = load_tokens_for_user(repo, user.id)
+    tokens = require_discogs_tokens(repo, user.id)
     background_tasks.add_task(
         _reprocess_item, item_id, image_bytes, content_type,
         item.batch_id, user_id=user.id, tokens=tokens,

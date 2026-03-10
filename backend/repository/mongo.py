@@ -39,6 +39,7 @@ class MongoRepository:
         ], name="collection_text_search")
         self._items.create_index([("user_id", ASCENDING), ("batch_id", ASCENDING)])
         self._batches.create_index([("user_id", ASCENDING)])
+        self._db["oauth_tokens"].create_index("username", name="oauth_username_lookup")
 
     # ── OAuth tokens ─────────────────────────────────────────────────────
 
@@ -126,6 +127,27 @@ class MongoRepository:
         )
         return result.deleted_count
 
+    def delete_collection_items(self, user_id: str, instance_ids: list[int]) -> int:
+        """Delete specific collection items by instance_id for a given user."""
+        if not instance_ids:
+            return 0
+        result = self._collection_items.delete_many(
+            {"user_id": user_id, "instance_id": {"$in": instance_ids}}
+        )
+        return result.deleted_count
+
+    def find_collection_items_by_instance_ids(
+        self, user_id: str, instance_ids: list[int],
+    ) -> list[CollectionItem]:
+        """Find collection items by their instance_ids (used to look up release_ids)."""
+        if not instance_ids:
+            return []
+        cursor = self._collection_items.find(
+            {"user_id": user_id, "instance_id": {"$in": instance_ids}},
+            {"_id": 0},
+        )
+        return [CollectionItem.from_dict(doc) for doc in cursor]
+
     # ── Sync status ────────────────────────────────────────────────────────
 
     def get_sync_status(self, user_id: str) -> dict:
@@ -138,6 +160,31 @@ class MongoRepository:
             {"$set": update},
             upsert=True,
         )
+
+    # ── User settings ─────────────────────────────────────────────────────
+
+    def get_user_settings(self, user_id: str) -> dict:
+        doc = self._db["user_settings"].find_one({"_id": user_id}, {"_id": 0})
+        return doc or {"collection_public": False}
+
+    def update_user_settings(self, user_id: str, settings: dict) -> None:
+        self._db["user_settings"].update_one(
+            {"_id": user_id},
+            {"$set": settings},
+            upsert=True,
+        )
+
+    def find_user_id_by_username(self, username: str) -> str | None:
+        """Look up a user_id by their Discogs username (stored in oauth_tokens)."""
+        doc = self._db["oauth_tokens"].find_one({"username": username})
+        if doc:
+            return doc["_id"]
+        return None
+
+    def find_discogs_username(self, user_id: str) -> str | None:
+        """Look up only the Discogs username for a user (no secrets loaded)."""
+        doc = self._db["oauth_tokens"].find_one({"_id": user_id}, {"_id": 0, "username": 1})
+        return doc.get("username") if doc else None
 
     # ── Search telemetry ──────────────────────────────────────────────────
 

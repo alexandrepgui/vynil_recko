@@ -189,6 +189,13 @@ def build_oauth_headers(tokens: OAuthTokens) -> dict:
     return {"Authorization": _oauth_header(auth_params)}
 
 
+class DiscogsNotConnectedError(Exception):
+    """Raised when a Discogs account is required but not connected."""
+
+    def __init__(self) -> None:
+        super().__init__("Discogs account not connected. Link your Discogs account first.")
+
+
 def load_tokens_for_user(repo, user_id: str) -> OAuthTokens | None:
     """Load a user's Discogs OAuth tokens from the database."""
     saved = repo.load_oauth_tokens(user_id)
@@ -199,3 +206,11 @@ def load_tokens_for_user(repo, user_id: str) -> OAuthTokens | None:
             username=saved.get("username"),
         )
     return None
+
+
+def require_discogs_tokens(repo, user_id: str) -> OAuthTokens:
+    """Load tokens or raise DiscogsNotConnectedError."""
+    tokens = load_tokens_for_user(repo, user_id)
+    if not tokens:
+        raise DiscogsNotConnectedError()
+    return tokens

@@ -139,11 +139,11 @@ def _to_discogs_results(ordered: list[dict]) -> list[DiscogsResult]:
 def process_single_image(
     image_bytes: bytes,
     content_type: str,
+    tokens: OAuthTokens,
     media_type: str = "vinyl",
     batch_id: str | None = None,
     item_id: str | None = None,
     user_id: str = "",
-    tokens: OAuthTokens | None = None,
 ) -> SearchResponse:
     """Run the full search pipeline for a single image.
 

@@ -44,3 +44,39 @@ class TestGetProfile:
         assert data["discogs"]["connected"] is True
         assert data["discogs"]["username"] == "dj_test"
         assert data["discogs"]["oauth_configured"] is True
+
+
+class TestGetSettings:
+    def test_returns_defaults(self, client):
+        test_client, mock_repo = client
+        mock_repo.get_user_settings.return_value = {"collection_public": False}
+        resp = test_client.get("/api/me/settings")
+        assert resp.status_code == 200
+        assert resp.json()["collection_public"] is False
+        mock_repo.get_user_settings.assert_called_once_with(TEST_USER_ID)
+
+    def test_returns_stored_settings(self, client):
+        test_client, mock_repo = client
+        mock_repo.get_user_settings.return_value = {"collection_public": True}
+        resp = test_client.get("/api/me/settings")
+        assert resp.status_code == 200
+        assert resp.json()["collection_public"] is True
+
+
+class TestUpdateSettings:
+    def test_update_collection_public(self, client):
+        test_client, mock_repo = client
+        mock_repo.get_user_settings.return_value = {"collection_public": True}
+        resp = test_client.put("/api/me/settings", json={"collection_public": True})
+        assert resp.status_code == 200
+        assert resp.json()["collection_public"] is True
+        mock_repo.update_user_settings.assert_called_once_with(
+            TEST_USER_ID, {"collection_public": True},
+        )
+
+    def test_update_empty_body(self, client):
+        test_client, mock_repo = client
+        mock_repo.get_user_settings.return_value = {"collection_public": False}
+        resp = test_client.put("/api/me/settings", json={})
+        assert resp.status_code == 200
+        mock_repo.update_user_settings.assert_not_called()

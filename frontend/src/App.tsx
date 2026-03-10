@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
@@ -126,6 +126,22 @@ function SingleSearchPage() {
   );
 }
 
+function PublicCollectionPage() {
+  const { username } = useParams<{ username: string }>();
+  if (!username) return <p className="error">No username provided.</p>;
+  return (
+    <div className="app public-collection-page">
+      <header className="app-header">
+        <div className="app-logo-row">
+          <img src={logoIcon} alt="" className="app-icon" />
+          <img src={logoImg} alt="groove log" className="app-logo" />
+        </div>
+      </header>
+      <CollectionView readOnly username={username} />
+    </div>
+  );
+}
+
 function AppInner() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -196,7 +212,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppInner />
+        <Routes>
+          <Route path="/collection/:username" element={<PublicCollectionPage />} />
+          <Route path="/*" element={<AppInner />} />
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   );

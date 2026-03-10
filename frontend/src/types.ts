@@ -89,6 +89,21 @@ export interface SyncStatus {
   error?: string | null;
 }
 
+export interface UserSettings {
+  collection_public: boolean;
+}
+
+export interface PublicCollectionResponse {
+  owner: {
+    username: string;
+  };
+  items: CollectionItem[];
+  page: number;
+  pages: number;
+  per_page: number;
+  total_items: number;
+}
+
 export interface Batch {
   batch_id: string;
   status: 'processing' | 'completed' | 'failed';

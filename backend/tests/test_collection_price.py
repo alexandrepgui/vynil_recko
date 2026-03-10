@@ -18,7 +18,11 @@ def mock_repo():
     repo.save_collection_record.side_effect = lambda r: repo.saved_records.append(r)
     # Default sync status: never synced
     repo.get_sync_status.return_value = {"status": "idle"}
-    repo.load_oauth_tokens.return_value = None
+    repo.load_oauth_tokens.return_value = {
+        "access_token": "test-token",
+        "access_token_secret": "test-secret",
+        "username": "testuser",
+    }
     return repo
 
 
@@ -213,3 +217,112 @@ def test_get_price_unexpected_error(client):
     with patch("routes.search.get_marketplace_stats", side_effect=RuntimeError("fail")):
         resp = client.get("/api/price/123")
     assert resp.status_code == 502
+
+
+# ── DELETE /api/collection ─────────────────────────────────────────────────
+
+
+def test_delete_collection_no_instance_ids(client, mock_repo):
+    resp = client.request("DELETE", "/api/collection", json={"instance_ids": []})
+    assert resp.status_code == 422  # Pydantic min_length=1 validation
+
+
+def test_delete_collection_no_discogs_connected(client, mock_repo):
+    mock_repo.load_oauth_tokens.return_value = None
+    resp = client.request("DELETE", "/api/collection", json={"instance_ids": [1]})
+    assert resp.status_code == 400
+    assert "not connected" in resp.json()["detail"].lower()
+
+
+def test_delete_collection_success(client, mock_repo):
+    mock_repo.load_oauth_tokens.return_value = {
+        "access_token": "a", "access_token_secret": "b", "username": "u",
+    }
+    mock_repo.find_collection_items_by_instance_ids.return_value = [
+        CollectionItem(user_id=TEST_USER_ID, instance_id=100, release_id=555, title="Test"),
+    ]
+    mock_repo.delete_collection_items.return_value = 1
+
+    with patch("routes.collection.remove_from_collection") as mock_remove:
+        resp = client.request("DELETE", "/api/collection", json={"instance_ids": [100]})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deleted"] == 1
+    assert body["errors"] == []
+    mock_remove.assert_called_once_with(555, 100, mock_remove.call_args[0][2])
+    mock_repo.delete_collection_items.assert_called_once()
+
+
+def test_delete_collection_partial_failure(client, mock_repo):
+    mock_repo.load_oauth_tokens.return_value = {
+        "access_token": "a", "access_token_secret": "b", "username": "u",
+    }
+    mock_repo.find_collection_items_by_instance_ids.return_value = [
+        CollectionItem(user_id=TEST_USER_ID, instance_id=100, release_id=555, title="A"),
+        CollectionItem(user_id=TEST_USER_ID, instance_id=200, release_id=666, title="B"),
+    ]
+    mock_repo.delete_collection_items.return_value = 1
+
+    def mock_remove_side_effect(release_id, instance_id, tokens):
+        if instance_id == 200:
+            raise RuntimeError("Discogs error")
+
+    with patch("routes.collection.remove_from_collection", side_effect=mock_remove_side_effect):
+        resp = client.request(
+            "DELETE", "/api/collection", json={"instance_ids": [100, 200]},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deleted"] == 1
+    assert len(body["errors"]) == 1
+    assert body["errors"][0]["instance_id"] == 200
+
+
+def test_delete_collection_not_found_in_db(client, mock_repo):
+    mock_repo.load_oauth_tokens.return_value = {
+        "access_token": "a", "access_token_secret": "b", "username": "u",
+    }
+    mock_repo.find_collection_items_by_instance_ids.return_value = []
+    mock_repo.delete_collection_items.return_value = 0
+
+    resp = client.request("DELETE", "/api/collection", json={"instance_ids": [999]})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deleted"] == 0
+    assert len(body["errors"]) == 1
+    assert body["errors"][0]["instance_id"] == 999
+
+
+# ── GET /api/collection/{username} (public) ──────────────────────────────
+
+
+def test_public_collection_user_not_found(client, mock_repo):
+    mock_repo.find_user_id_by_username.return_value = None
+    resp = client.get("/api/collection/nonexistent_user")
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()
+
+
+def test_public_collection_private(client, mock_repo):
+    mock_repo.find_user_id_by_username.return_value = "other-user-id"
+    mock_repo.get_user_settings.return_value = {"collection_public": False}
+    resp = client.get("/api/collection/some_user")
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()
+
+
+def test_public_collection_success(client, mock_repo):
+    mock_repo.find_user_id_by_username.return_value = "other-user-id"
+    mock_repo.get_user_settings.return_value = {"collection_public": True}
+    mock_repo.find_collection_items.return_value = [SAMPLE_ITEM]
+    mock_repo.count_collection_items.return_value = 1
+
+    resp = client.get("/api/collection/dj_public")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["owner"]["username"] == "dj_public"
+    assert len(body["items"]) == 1
+    assert body["total_items"] == 1

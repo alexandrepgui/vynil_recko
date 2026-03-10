@@ -1,15 +1,17 @@
-"""Tests for services/discogs.py: prefilter, score_by_metadata, _sanity_check, _best_similarity, _normalize_catno."""
+"""Tests for services/discogs.py: prefilter, score_by_metadata, _sanity_check, _best_similarity, _normalize_catno, remove_from_collection."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from services.discogs import (
     _best_similarity,
     _normalize_catno,
     _sanity_check,
     prefilter,
+    remove_from_collection,
     score_by_metadata,
     generate_search_candidates,
 )
+from services.discogs_auth import OAuthTokens
 
 
 # ── prefilter ─────────────────────────────────────────────────────────────────
@@ -304,3 +306,39 @@ class TestSanityCheckThreshold:
         results = [{"title": "Miles Davis Quintet - Relaxin'"}]
         passed = _sanity_check(results, ["Relaxin'"], ["Miles Davis"])
         assert len(passed) == 1
+
+
+# ── remove_from_collection ──────────────────────────────────────────────────
+
+
+class TestRemoveFromCollection:
+    @patch("services.discogs._session")
+    def test_remove_from_collection_success(self, mock_session):
+        tokens = OAuthTokens(access_token="a", access_token_secret="b", username="testuser")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 204
+        mock_resp.headers = {"X-Discogs-Ratelimit-Remaining": "50"}
+        mock_resp.raise_for_status = MagicMock()
+        mock_session.delete.return_value = mock_resp
+
+        remove_from_collection(release_id=555, instance_id=100, tokens=tokens)
+
+        mock_session.delete.assert_called_once()
+        url = mock_session.delete.call_args[0][0]
+        assert "/users/testuser/collection/folders/0/releases/555/instances/100" in url
+
+    @patch("services.discogs._session")
+    def test_remove_from_collection_raises_on_error(self, mock_session):
+        import requests
+        tokens = OAuthTokens(access_token="a", access_token_secret="b", username="testuser")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.headers = {"X-Discogs-Ratelimit-Remaining": "50"}
+        mock_resp.raise_for_status.side_effect = requests.HTTPError("Not Found")
+        mock_session.delete.return_value = mock_resp
+
+        try:
+            remove_from_collection(release_id=555, instance_id=100, tokens=tokens)
+            assert False, "Should have raised"
+        except requests.HTTPError:
+            pass

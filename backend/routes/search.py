@@ -11,7 +11,7 @@ from models import AddToCollectionRequest, MediaType, SearchResponse
 from repository import BatchItem, CollectionRecord, SearchRecord
 from repository.mongo import MongoRepository
 from services.discogs import add_to_collection, get_marketplace_stats
-from services.discogs_auth import load_tokens_for_user
+from services.discogs_auth import require_discogs_tokens
 from services.search import process_single_image
 from utils import save_upload_image
 
@@ -51,7 +51,7 @@ async def search(
     record.image_size_bytes = len(image_bytes)
     log.info("Image size: %d bytes (%.1f KB)", len(image_bytes), len(image_bytes) / 1024)
 
-    tokens = load_tokens_for_user(repo, user.id)
+    tokens = require_discogs_tokens(repo, user.id)
 
     try:
         response = process_single_image(
@@ -107,7 +107,7 @@ async def add_to_collection_endpoint(
 
     log.info("Add to collection request: user_id=%s release_id=%d", user.id, body.release_id)
 
-    tokens = load_tokens_for_user(repo, user.id)
+    tokens = require_discogs_tokens(repo, user.id)
 
     try:
         instance = add_to_collection(body.release_id, tokens=tokens)
@@ -157,7 +157,7 @@ async def get_price(
     repo: MongoRepository = Depends(get_repo),
 ):
     """Fetch marketplace price stats for a Discogs release."""
-    tokens = load_tokens_for_user(repo, user.id)
+    tokens = require_discogs_tokens(repo, user.id)
     try:
         stats = get_marketplace_stats(release_id, tokens=tokens)
     except requests.HTTPError as e:

@@ -18,7 +18,11 @@ def mock_repo():
     repo = MagicMock()
     repo.saved_records = []
     repo.save_search_record.side_effect = lambda r: repo.saved_records.append(r)
-    repo.load_oauth_tokens.return_value = None
+    repo.load_oauth_tokens.return_value = {
+        "access_token": "test-token",
+        "access_token_secret": "test-secret",
+        "username": "testuser",
+    }
     return repo
 
 

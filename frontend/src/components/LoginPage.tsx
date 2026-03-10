@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import hideIcon from '../assets/hide.svg';
 import viewIcon from '../assets/view.svg';
+import logoIcon from '../assets/icon.svg';
+import logoImg from '../assets/logo.svg';
 import { supabase } from '../supabaseClient';
 
 type Mode = 'login' | 'signup';
@@ -45,7 +47,10 @@ export default function LoginPage() {
     return (
       <div className="login-page">
         <div className="login-card">
-          <h1>groove log</h1>
+          <div className="login-logo">
+            <img src={logoIcon} alt="" className="login-icon" />
+            <img src={logoImg} alt="groove log" className="login-wordmark" />
+          </div>
           <p className="login-success">Check your email to confirm your account, then log in.</p>
           <button className="btn btn-primary" onClick={() => { setSignupSuccess(false); setMode('login'); }}>
             Back to Login
@@ -58,7 +63,10 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>groove log</h1>
+        <div className="login-logo">
+          <img src={logoIcon} alt="" className="login-icon" />
+          <img src={logoImg} alt="groove log" className="login-wordmark" />
+        </div>
         <p className="login-subtitle">Identify your vinyl and CDs from label photos</p>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -97,6 +105,12 @@ export default function LoginPage() {
         <div className="login-divider"><span>or</span></div>
 
         <button className="btn btn-google" onClick={handleGoogleLogin}>
+          <svg className="google-logo" viewBox="-0.5 0 48 48" width="18" height="18">
+            <path d="M9.827,24c0-1.524.253-3.086.705-4.356L2.623,13.604C1.082,16.734.214,20.26.214,24c0,3.737.867,7.261,2.406,10.388l7.905-6.051c-.453-1.364-.698-2.82-.698-4.337" fill="#FBBC05"/>
+            <path d="M23.714,10.133c3.311,0,6.302,1.173,8.652,3.093l6.837-6.826C35.036,2.773,29.695.533,23.714.533,14.427.533,6.445,5.844,2.623,13.604l7.909,6.04c1.822-5.532,7.017-9.511,13.182-9.511" fill="#EB4335"/>
+            <path d="M23.714,37.867c-6.165,0-11.359-3.979-13.182-9.511l-7.909,6.038c3.822,7.761,11.804,13.072,21.091,13.072,5.732,0,11.204-2.036,15.311-5.849l-7.507-5.804c-2.118,1.335-4.786,2.054-7.804,2.054" fill="#34A853"/>
+            <path d="M46.145,24c0-1.387-.213-2.88-.534-4.267H23.714V28.8h12.604c-.63,3.091-2.346,5.468-4.8,7.014l7.507,5.804c4.315-4.004,7.12-9.969,7.12-17.618" fill="#4285F4"/>
+          </svg>
           Sign in with Google
         </button>
 

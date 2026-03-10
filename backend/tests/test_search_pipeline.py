@@ -5,7 +5,10 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from conftest import FAKE_RANKING, make_discogs_response, make_mock_llm_client
+from services.discogs_auth import OAuthTokens
 from services.search import _SPACER_GIF, _build_debug, process_single_image
+
+_FAKE_TOKENS = OAuthTokens(access_token="t", access_token_secret="s", username="testuser")
 
 # Default release used by tests that don't need custom releases.
 _DEFAULT_RELEASE = {
@@ -39,7 +42,7 @@ def _run_pipeline(label_data, discogs_results=None, ranking=None):
         patch("services.vision._write_cache"),
         patch("services.search.get_repo", return_value=mock_repo),
     ):
-        return process_single_image(b"fake-image", "image/jpeg")
+        return process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
 
 _UNSET = object()
@@ -216,7 +219,7 @@ class TestStrategyFallthrough:
             patch("services.search.get_repo", return_value=mock_repo),
             patch("services.search.generate_search_candidates", side_effect=fake_generator),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 1
         assert resp.results[0].discogs_id == 2
@@ -247,7 +250,7 @@ class TestStrategyFallthrough:
             patch("services.search.get_repo", return_value=mock_repo),
             patch("services.search.generate_search_candidates", side_effect=fake_generator),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 0
         assert resp.results == []
@@ -270,7 +273,7 @@ class TestNoResults:
             patch("services.vision._write_cache"),
             patch("services.search.get_repo", return_value=mock_repo),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 0
         assert resp.results == []

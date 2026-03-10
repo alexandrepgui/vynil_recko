@@ -303,6 +303,40 @@ def test_delete_stale_items(repo):
     assert filt["user_id"] == USER_ID
 
 
+def test_delete_collection_items_empty(repo):
+    assert repo.delete_collection_items(USER_ID, []) == 0
+    repo._collection_items.delete_many.assert_not_called()
+
+
+def test_delete_collection_items(repo):
+    mock_result = MagicMock()
+    mock_result.deleted_count = 2
+    repo._collection_items.delete_many.return_value = mock_result
+    assert repo.delete_collection_items(USER_ID, [100, 200]) == 2
+    filt = repo._collection_items.delete_many.call_args[0][0]
+    assert filt["user_id"] == USER_ID
+    assert filt["instance_id"] == {"$in": [100, 200]}
+
+
+def test_find_collection_items_by_instance_ids_empty(repo):
+    result = repo.find_collection_items_by_instance_ids(USER_ID, [])
+    assert result == []
+    repo._collection_items.find.assert_not_called()
+
+
+def test_find_collection_items_by_instance_ids(repo):
+    repo._collection_items.find.return_value = [
+        {"user_id": USER_ID, "instance_id": 100, "release_id": 555, "title": "A", "artist": "X"},
+    ]
+    results = repo.find_collection_items_by_instance_ids(USER_ID, [100])
+    assert len(results) == 1
+    assert results[0].instance_id == 100
+    assert results[0].release_id == 555
+    filt = repo._collection_items.find.call_args[0][0]
+    assert filt["user_id"] == USER_ID
+    assert filt["instance_id"] == {"$in": [100]}
+
+
 # ── Sync status ─────────────────────────────────────────────────────────────
 
 

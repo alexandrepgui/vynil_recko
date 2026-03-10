@@ -114,8 +114,12 @@ def mock_repo():
         repo.saved_records.append(record)
 
     repo.save_search_record.side_effect = capture_save
-    # Return None for oauth token lookups by default (no Discogs connection)
-    repo.load_oauth_tokens.return_value = None
+    # Return valid OAuth tokens by default (Discogs connected)
+    repo.load_oauth_tokens.return_value = {
+        "access_token": "test-token",
+        "access_token_secret": "test-secret",
+        "username": "testuser",
+    }
     return repo
 
 

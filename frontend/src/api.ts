@@ -1,5 +1,5 @@
 import { getAccessToken } from './AuthContext';
-import type { Batch, BatchItem, CollectionResponse, DiscogsStatus, MediaType, SearchResponse, SyncStatus, UserProfile } from './types';
+import type { Batch, BatchItem, CollectionResponse, DiscogsStatus, MediaType, PublicCollectionResponse, SearchResponse, SyncStatus, UserProfile, UserSettings } from './types';
 
 // ── Auth-aware fetch wrapper ────────────────────────────────────────────
 
@@ -153,13 +153,9 @@ export async function retryItem(itemId: string): Promise<void> {
 
 // ── Collection (browse) ──────────────────────────────────────────────────
 
-export async function getCollection(
-  page: number = 1,
-  perPage: number = 50,
-  sort: string = 'artist',
-  sortOrder: string = 'asc',
-  search: string = '',
-): Promise<CollectionResponse> {
+function buildCollectionParams(
+  page: number, perPage: number, sort: string, sortOrder: string, search: string,
+): URLSearchParams {
   const params = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
@@ -167,6 +163,17 @@ export async function getCollection(
     sort_order: sortOrder,
   });
   if (search.trim()) params.set('q', search.trim());
+  return params;
+}
+
+export async function getCollection(
+  page: number = 1,
+  perPage: number = 50,
+  sort: string = 'artist',
+  sortOrder: string = 'asc',
+  search: string = '',
+): Promise<CollectionResponse> {
+  const params = buildCollectionParams(page, perPage, sort, sortOrder, search);
   const resp = await authFetch(`/api/collection?${params}`);
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
@@ -184,9 +191,61 @@ export async function triggerCollectionSync(): Promise<{ message: string }> {
   return resp.json();
 }
 
+export async function deleteCollectionItems(
+  instanceIds: number[],
+): Promise<{ deleted: number; errors: { instance_id: number; error: string }[] }> {
+  const resp = await authFetch('/api/collection', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instance_ids: instanceIds }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to delete items (${resp.status})`);
+  }
+  return resp.json();
+}
+
 export async function getCollectionSyncStatus(): Promise<SyncStatus> {
   const resp = await authFetch('/api/collection/sync');
   if (!resp.ok) throw new Error(`Failed to fetch sync status (${resp.status})`);
+  return resp.json();
+}
+
+// ── Public collection ────────────────────────────────────────────────────
+
+export async function getPublicCollection(
+  username: string,
+  page: number = 1,
+  perPage: number = 50,
+  sort: string = 'artist',
+  sortOrder: string = 'asc',
+  search: string = '',
+): Promise<PublicCollectionResponse> {
+  const params = buildCollectionParams(page, perPage, sort, sortOrder, search);
+  const resp = await fetch(`/api/collection/${encodeURIComponent(username)}?${params}`);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
+  }
+  return resp.json();
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────
+
+export async function getSettings(): Promise<UserSettings> {
+  const resp = await authFetch('/api/me/settings');
+  if (!resp.ok) throw new Error(`Failed to fetch settings (${resp.status})`);
+  return resp.json();
+}
+
+export async function updateSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
+  const resp = await authFetch('/api/me/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!resp.ok) throw new Error(`Failed to update settings (${resp.status})`);
   return resp.json();
 }
 
