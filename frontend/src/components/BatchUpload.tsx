@@ -16,7 +16,7 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.zip')) {
-        setError('Please upload a .zip file containing JPEG or PNG images.');
+        setError('That doesn\'t look like a .zip file. Try a .zip with JPEG or PNG images inside.');
         return;
       }
       setError(null);
@@ -26,7 +26,7 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
         const { batch_id, total_images } = await uploadBatch(file, mediaType);
         onBatchCreated(batch_id, total_images);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Upload failed.');
+        setError(e instanceof Error ? e.message : 'Upload didn\'t work. Want to try again?');
       } finally {
         setIsUploading(false);
       }

@@ -31,7 +31,7 @@ export default function DiscogsAuth() {
       const authorizeUrl = await startDiscogsLogin();
       window.location.href = authorizeUrl;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start login');
+      setError(e instanceof Error ? e.message : 'Couldn\'t connect to Discogs. Try again?');
       setLoading(false);
     }
   };
@@ -41,7 +41,7 @@ export default function DiscogsAuth() {
       await discogsLogout();
       setStatus({ ...status, authenticated: false, username: null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to logout');
+      setError(e instanceof Error ? e.message : 'Couldn\'t disconnect from Discogs. Try again?');
     }
   };
 

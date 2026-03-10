@@ -128,7 +128,7 @@ function SingleSearchPage() {
 
 function PublicCollectionPage() {
   const { username } = useParams<{ username: string }>();
-  if (!username) return <p className="error">No username provided.</p>;
+  if (!username) return <p className="error">We need a username to show this collection.</p>;
   return (
     <div className="app public-collection-page">
       <header className="app-header">

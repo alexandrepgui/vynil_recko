@@ -15,7 +15,7 @@ export default function ReviewView() {
       const unreviewed = await getAllReviewItems('unreviewed');
       setItems(unreviewed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load review items.');
+      setError(e instanceof Error ? e.message : 'Couldn\'t load the review queue. Try refreshing?');
     } finally {
       setLoading(false);
     }

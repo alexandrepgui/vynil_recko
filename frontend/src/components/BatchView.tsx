@@ -51,7 +51,7 @@ export default function BatchView({ onGoToReview }: Props) {
           setPhase('done');
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Polling failed.');
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Lost track of the batch progress. Try refreshing?');
       }
     };
 
@@ -102,7 +102,7 @@ export default function BatchView({ onGoToReview }: Props) {
         <div className="batch-summary">
           <h3>Batch complete</h3>
           <p>
-            {batch.processed} processed, {batch.failed} failed out of {batch.total_images} images.
+            {batch.processed} processed, {batch.failed} couldn't be processed out of {batch.total_images} images.
           </p>
           <div className="batch-done-actions">
             {onGoToReview && (

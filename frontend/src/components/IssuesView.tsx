@@ -21,7 +21,7 @@ export default function IssuesView() {
       setWrongItems(wrong);
       setErrorItems(errored);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load issues.');
+      setError(e instanceof Error ? e.message : 'Couldn\'t load issues. Try refreshing?');
     } finally {
       setLoading(false);
     }

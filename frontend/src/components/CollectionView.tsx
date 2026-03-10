@@ -130,7 +130,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         setTotalItems(data.total_items);
         if ('owner' in data) setOwnerName(data.owner.username);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load collection.');
+        setError(e instanceof Error ? e.message : 'Couldn\'t load the collection. Try refreshing?');
       } finally {
         setLoading(false);
       }
@@ -220,7 +220,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       setSyncStatus((prev) => ({ ...prev, status: 'syncing', items_synced: 0 } as SyncStatus));
       startPolling();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start sync.');
+      setError(e instanceof Error ? e.message : 'Couldn\'t start the sync. Try again?');
     }
   };
 
@@ -275,7 +275,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         msgs.push(`${result.deleted} record${result.deleted !== 1 ? 's' : ''} deleted.`);
       }
       if (result.errors.length > 0) {
-        msgs.push(`${result.errors.length} failed.`);
+        msgs.push(`${result.errors.length} couldn't be removed.`);
       }
       setDeleteMessage(msgs.join(' '));
       setSelectedIds(new Set());
@@ -283,7 +283,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       // Refresh the current page
       fetchCollection(page, pageSize, sort, sortOrder, debouncedSearch);
     } catch (e) {
-      setDeleteMessage(e instanceof Error ? e.message : 'Delete failed.');
+      setDeleteMessage(e instanceof Error ? e.message : 'Couldn\'t delete that. Try again?');
       setShowDeleteModal(false);
     } finally {
       setDeleting(false);
@@ -319,7 +319,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
             Fetch my collection
           </button>
           {syncStatus?.status === 'error' && (
-            <p className="error">{syncStatus.error || 'Sync failed. Please try again.'}</p>
+            <p className="error">{syncStatus.error || 'Sync didn\'t work. Want to try again?'}</p>
           )}
           {error && <p className="error">{error}</p>}
         </div>

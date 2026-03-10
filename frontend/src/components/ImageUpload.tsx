@@ -18,7 +18,7 @@ export default function ImageUpload({ onFileSelected, onClear, isLoading, mediaT
 
   const stageFile = useCallback((file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      alert('Please upload a JPEG or PNG image.');
+      alert('That file type isn\'t supported. Try a JPEG or PNG image.');
       return;
     }
     setStagedFile(file);

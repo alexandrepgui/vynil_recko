@@ -27,7 +27,7 @@ export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', 
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Search failed (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t find any matches. Want to try again?');
   }
 
   return resp.json();
@@ -42,7 +42,7 @@ export async function addToCollection(releaseId: number): Promise<void> {
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to add to collection (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t add that to your collection. Try again?');
   }
 }
 
@@ -60,7 +60,7 @@ export async function uploadBatch(
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Batch upload failed (${resp.status})`);
+    throw new Error(body?.detail ?? 'Upload didn\'t work. Want to try again?');
   }
 
   return resp.json();
@@ -68,7 +68,7 @@ export async function uploadBatch(
 
 export async function getBatch(batchId: string): Promise<Batch> {
   const resp = await authFetch(`/api/batch/${batchId}`);
-  if (!resp.ok) throw new Error(`Failed to fetch batch (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t load that batch. Try refreshing?');
   return resp.json();
 }
 
@@ -78,7 +78,7 @@ export async function getBatchItems(
 ): Promise<BatchItem[]> {
   const params = reviewStatus ? `?review_status=${reviewStatus}` : '';
   const resp = await authFetch(`/api/batch/${batchId}/items${params}`);
-  if (!resp.ok) throw new Error(`Failed to fetch batch items (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t load the batch items. Try refreshing?');
   return resp.json();
 }
 
@@ -97,7 +97,7 @@ export async function reviewItem(
     }),
   });
 
-  if (!resp.ok) throw new Error(`Failed to review item (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t save that review. Try again?');
 }
 
 // ── Global review (across all batches + single searches) ─────────────────
@@ -111,7 +111,7 @@ export async function getAllReviewItems(
   if (status) query.set('status', status);
   const qs = query.toString();
   const resp = await authFetch(`/api/review/items${qs ? `?${qs}` : ''}`);
-  if (!resp.ok) throw new Error(`Failed to fetch review items (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t load the review queue. Try refreshing?');
   return resp.json();
 }
 
@@ -129,7 +129,7 @@ export async function reviewItemGlobal(
     }),
   });
 
-  if (!resp.ok) throw new Error(`Failed to review item (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t save that review. Try again?');
 }
 
 export async function undoReviewItem(itemId: string): Promise<void> {
@@ -137,7 +137,7 @@ export async function undoReviewItem(itemId: string): Promise<void> {
     method: 'POST',
   });
 
-  if (!resp.ok) throw new Error(`Failed to undo review (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t undo that review. Try again?');
 }
 
 export async function retryItem(itemId: string): Promise<void> {
@@ -147,7 +147,7 @@ export async function retryItem(itemId: string): Promise<void> {
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to retry item (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t retry that item. Try again in a moment?');
   }
 }
 
@@ -177,7 +177,7 @@ export async function getCollection(
   const resp = await authFetch(`/api/collection?${params}`);
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t load your collection. Try refreshing?');
   }
   return resp.json();
 }
@@ -186,7 +186,7 @@ export async function triggerCollectionSync(): Promise<{ message: string }> {
   const resp = await authFetch('/api/collection/sync', { method: 'POST' });
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to trigger sync (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t start the sync. Try again in a moment?');
   }
   return resp.json();
 }
@@ -201,14 +201,14 @@ export async function deleteCollectionItems(
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to delete items (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t delete those items. Try again?');
   }
   return resp.json();
 }
 
 export async function getCollectionSyncStatus(): Promise<SyncStatus> {
   const resp = await authFetch('/api/collection/sync');
-  if (!resp.ok) throw new Error(`Failed to fetch sync status (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t check the sync status. Try refreshing?');
   return resp.json();
 }
 
@@ -226,7 +226,7 @@ export async function getPublicCollection(
   const resp = await fetch(`/api/collection/${encodeURIComponent(username)}?${params}`);
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t load this collection. Try refreshing?');
   }
   return resp.json();
 }
@@ -235,7 +235,7 @@ export async function getPublicCollection(
 
 export async function getSettings(): Promise<UserSettings> {
   const resp = await authFetch('/api/me/settings');
-  if (!resp.ok) throw new Error(`Failed to fetch settings (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t load your settings. Try refreshing?');
   return resp.json();
 }
 
@@ -245,7 +245,7 @@ export async function updateSettings(settings: Partial<UserSettings>): Promise<U
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
   });
-  if (!resp.ok) throw new Error(`Failed to update settings (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t save your settings. Try again?');
   return resp.json();
 }
 
@@ -261,7 +261,7 @@ export async function getPrice(releaseId: number): Promise<{ lowest_price: numbe
 
 export async function getProfile(): Promise<UserProfile> {
   const resp = await authFetch('/api/me');
-  if (!resp.ok) throw new Error(`Failed to fetch profile (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t load your profile. Try refreshing?');
   return resp.json();
 }
 
@@ -269,7 +269,7 @@ export async function getProfile(): Promise<UserProfile> {
 
 export async function getDiscogsStatus(): Promise<DiscogsStatus> {
   const resp = await authFetch('/api/discogs/status');
-  if (!resp.ok) throw new Error(`Failed to fetch Discogs status (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t reach Discogs. Try again?');
   return resp.json();
 }
 
@@ -277,7 +277,7 @@ export async function startDiscogsLogin(): Promise<string> {
   const resp = await authFetch('/api/discogs/login');
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to start Discogs login (${resp.status})`);
+    throw new Error(body?.detail ?? 'Couldn\'t connect to Discogs. Try again in a moment?');
   }
   const data = await resp.json();
   return data.authorize_url;
@@ -285,5 +285,5 @@ export async function startDiscogsLogin(): Promise<string> {
 
 export async function discogsLogout(): Promise<void> {
   const resp = await authFetch('/api/discogs/logout', { method: 'POST' });
-  if (!resp.ok) throw new Error(`Failed to disconnect Discogs (${resp.status})`);
+  if (!resp.ok) throw new Error('Couldn\'t disconnect from Discogs. Try again?');
 }
