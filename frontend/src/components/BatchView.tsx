@@ -67,7 +67,15 @@ export default function BatchView({ onGoToReview }: Props) {
   }, []);
 
   if (phase === 'select') {
-    return <MediaTypeSelector onSelect={handleSelect} />;
+    return (
+      <div>
+        <p className="batch-instructions">
+          Upload a <strong>.zip</strong> file containing photos of your discs (JPEG or PNG).
+          First, select the media type:
+        </p>
+        <MediaTypeSelector onSelect={handleSelect} />
+      </div>
+    );
   }
 
   return (

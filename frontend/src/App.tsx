@@ -4,7 +4,6 @@ import './App.css';
 import { searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
-import DiscogsAuth from './components/DiscogsAuth';
 import ImageUpload from './components/ImageUpload';
 import LoginPage from './components/LoginPage';
 import MediaTypeSelector from './components/MediaTypeSelector';
@@ -13,6 +12,7 @@ import BatchView from './components/BatchView';
 import ReviewView from './components/ReviewView';
 import IssuesView from './components/IssuesView';
 import CollectionView from './components/CollectionView';
+import ProfilePage from './components/ProfilePage';
 import vinylIcon from './assets/vinyl.svg';
 import cdIcon from './assets/cd.svg';
 import singleSearchIcon from './assets/single-search.svg';
@@ -20,6 +20,7 @@ import batchIcon from './assets/batch.svg';
 import reviewIcon from './assets/review.svg';
 import issuesIcon from './assets/issues.svg';
 import collectionIcon from './assets/collection.svg';
+import profileIcon from './assets/profile.svg';
 
 function SingleSearchPage() {
   const [mediaType, setMediaType] = useState<MediaType | null>(null);
@@ -71,7 +72,15 @@ function SingleSearchPage() {
   };
 
   if (!mediaType) {
-    return <MediaTypeSelector onSelect={setMediaType} />;
+    return (
+      <div>
+        <p className="batch-instructions">
+          Upload a single photo of your disc (JPEG or PNG).
+          First, select the media type:
+        </p>
+        <MediaTypeSelector onSelect={setMediaType} />
+      </div>
+    );
   }
 
   return (
@@ -117,7 +126,7 @@ function SingleSearchPage() {
 
 function AppInner() {
   const navigate = useNavigate();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -154,18 +163,15 @@ function AppInner() {
           <img src={collectionIcon} alt="" className="tab-icon" />
           Collection
         </NavLink>
+        <NavLink to="/profile" className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}>
+          <img src={profileIcon} alt="" className="tab-icon" />
+          Profile
+        </NavLink>
       </nav>
 
       <header className="app-header">
-        <div className="header-top">
-          <h1>Groove Log</h1>
-          <div className="header-user">
-            <span className="user-email">{user.email}</span>
-            <button className="btn btn-sign-out" onClick={signOut}>Sign Out</button>
-          </div>
-        </div>
+        <h1>Groove Log</h1>
         <p>Identify your records by photo</p>
-        <DiscogsAuth />
       </header>
 
       <Routes>
@@ -174,6 +180,7 @@ function AppInner() {
         <Route path="/review" element={<ReviewView />} />
         <Route path="/issues" element={<IssuesView />} />
         <Route path="/collection" element={<CollectionView />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

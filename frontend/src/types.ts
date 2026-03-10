@@ -1,5 +1,17 @@
 export type MediaType = 'vinyl' | 'cd';
 
+export interface UserProfile {
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  discogs: {
+    oauth_configured: boolean;
+    connected: boolean;
+    username: string | null;
+  };
+}
+
 export interface DiscogsStatus {
   oauth_configured: boolean;
   authenticated: boolean;

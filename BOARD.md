@@ -8,31 +8,6 @@
 
 ## Backlog
 
-### T10: User Profile Page with Avatar
-
-**Goal:** Add a user profile page accessible from a profile picture / avatar in the top-right corner of the app. Clicking the avatar opens the user page with account details and settings.
-
-**Details:**
-- Display the user's profile picture (from Google OAuth / Supabase auth) as a circular avatar in the top-right corner of the navigation bar
-- If no profile picture is available, show a fallback with the user's initials
-- Clicking the avatar navigates to a `/profile` page (using existing React Router setup from T7)
-- Profile page shows: profile picture (large), display name, email, and a sign-out button
-- Discogs connection section: if connected, show Discogs username and a "Disconnect Discogs" button that revokes the OAuth token and clears stored credentials; if not connected, show a "Connect Discogs" button that initiates the existing OAuth flow
-- Support uploading a custom profile picture (store in Supabase Storage)
-- Backend: add `GET /api/me` endpoint returning the authenticated user's profile info
-- Frontend: new `ProfilePage.tsx` component; avatar button in the app header
-
-**Files to create/modify:**
-- `backend/routes/profile.py` (create — `/api/me` endpoint, `DELETE /api/me/discogs` to revoke token)
-- `backend/main.py` (register new router)
-- `frontend/src/components/ProfilePage.tsx` (create)
-- `frontend/src/components/AvatarButton.tsx` (create — top-right avatar with navigation)
-- `frontend/src/App.tsx` (add avatar to header, add `/profile` route)
-- `frontend/src/App.css` (avatar and profile page styles)
-- `frontend/src/api.ts` (add profile API calls)
-
----
-
 ### T9: Configure Supabase Cloud & Google OAuth (Manual)
 
 **Goal:** Set up production-ready Supabase project with Google sign-in provider. This is a manual task — no code changes needed.
@@ -91,6 +66,33 @@ _(empty)_
 ---
 
 ## Finished
+
+### T10: User Profile Page with Avatar
+
+**Goal:** Add a user profile page with account details, avatar upload, Discogs connection management, and sign-out.
+
+**Details:**
+- Profile tab in the top nav bar with user icon (alongside other pages)
+- Profile page shows: avatar (from OAuth or uploaded), display name, email, sign-out button
+- Avatar upload via Supabase Storage (`avatars` bucket), saved to user metadata
+- Placeholder user icon SVG for fallback (no initials)
+- Discogs connection section: connect/disconnect with status display
+- Backend `GET /api/me` returns user info + Discogs connection status
+
+**Files created/modified:**
+- `backend/auth.py` — extended `User` dataclass with `name` and `avatar_url` from JWT `user_metadata`
+- `backend/routes/profile.py` (created — `GET /api/me`)
+- `backend/main.py` — registered profile router
+- `backend/tests/test_profile_routes.py` (created)
+- `frontend/src/types.ts` — added `UserProfile` interface
+- `frontend/src/api.ts` — added `getProfile()`
+- `frontend/src/assets/profile.svg` (created — user silhouette icon)
+- `frontend/src/components/ProfilePage.tsx` (created — profile page with avatar upload)
+- `frontend/src/App.tsx` — added Profile tab to nav bar, added `/profile` route
+- `frontend/src/App.css` — profile page and avatar styles
+- `supabase/config.toml` — added `avatars` storage bucket
+
+---
 
 ### T6: LLM Cost Tracking & Provider Abstraction
 

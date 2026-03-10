@@ -37,6 +37,8 @@ class User:
     """Authenticated user extracted from a Supabase JWT."""
     id: str
     email: str | None = None
+    name: str | None = None
+    avatar_url: str | None = None
 
 
 def get_current_user(
@@ -63,7 +65,10 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         )
+    user_metadata = payload.get("user_metadata") or {}
     return User(
         id=user_id,
         email=payload.get("email"),
+        name=user_metadata.get("full_name") or user_metadata.get("name"),
+        avatar_url=user_metadata.get("avatar_url") or user_metadata.get("picture"),
     )

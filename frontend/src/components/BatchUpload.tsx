@@ -68,8 +68,11 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
           <p>Uploading...</p>
         ) : (
           <>
-            <p>Drop a .zip of {mediaType === 'cd' ? 'CD' : 'vinyl label'} images here</p>
+            <p>Drop a <strong>.zip</strong> file here</p>
             <p className="upload-hint">or click to browse</p>
+            <p className="upload-hint">
+              Must contain {mediaType === 'cd' ? 'CD' : 'vinyl label'} photos (JPEG or PNG)
+            </p>
           </>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { getAccessToken } from './AuthContext';
-import type { Batch, BatchItem, CollectionResponse, DiscogsStatus, MediaType, SearchResponse, SyncStatus } from './types';
+import type { Batch, BatchItem, CollectionResponse, DiscogsStatus, MediaType, SearchResponse, SyncStatus, UserProfile } from './types';
 
 // ── Auth-aware fetch wrapper ────────────────────────────────────────────
 
@@ -195,6 +195,14 @@ export async function getCollectionSyncStatus(): Promise<SyncStatus> {
 export async function getPrice(releaseId: number): Promise<{ lowest_price: number | null; num_for_sale: number; currency: string | null }> {
   const resp = await authFetch(`/api/price/${releaseId}`);
   if (!resp.ok) return { lowest_price: null, num_for_sale: 0, currency: null };
+  return resp.json();
+}
+
+// ── Profile ──────────────────────────────────────────────────────────
+
+export async function getProfile(): Promise<UserProfile> {
+  const resp = await authFetch('/api/me');
+  if (!resp.ok) throw new Error(`Failed to fetch profile (${resp.status})`);
   return resp.json();
 }
 
