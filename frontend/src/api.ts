@@ -1,11 +1,25 @@
-import type { AuthStatus, Batch, BatchItem, CollectionResponse, MediaType, SearchResponse, SyncStatus } from './types';
+import { getAccessToken } from './AuthContext';
+import type { Batch, BatchItem, CollectionResponse, DiscogsStatus, MediaType, SearchResponse, SyncStatus } from './types';
+
+// ── Auth-aware fetch wrapper ────────────────────────────────────────────
+
+function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  const token = getAccessToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(input, { ...init, headers });
+}
+
+// ── Search ──────────────────────────────────────────────────────────────
 
 export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', signal?: AbortSignal): Promise<SearchResponse> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('media_type', mediaType);
 
-  const resp = await fetch('/api/search', {
+  const resp = await authFetch('/api/search', {
     method: 'POST',
     body: formData,
     signal,
@@ -20,7 +34,7 @@ export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', 
 }
 
 export async function addToCollection(releaseId: number): Promise<void> {
-  const resp = await fetch('/api/collection', {
+  const resp = await authFetch('/api/collection', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ release_id: releaseId }),
@@ -42,7 +56,7 @@ export async function uploadBatch(
   formData.append('file', file);
   formData.append('media_type', mediaType);
 
-  const resp = await fetch('/api/batch', { method: 'POST', body: formData });
+  const resp = await authFetch('/api/batch', { method: 'POST', body: formData });
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
@@ -53,7 +67,7 @@ export async function uploadBatch(
 }
 
 export async function getBatch(batchId: string): Promise<Batch> {
-  const resp = await fetch(`/api/batch/${batchId}`);
+  const resp = await authFetch(`/api/batch/${batchId}`);
   if (!resp.ok) throw new Error(`Failed to fetch batch (${resp.status})`);
   return resp.json();
 }
@@ -63,7 +77,7 @@ export async function getBatchItems(
   reviewStatus?: string,
 ): Promise<BatchItem[]> {
   const params = reviewStatus ? `?review_status=${reviewStatus}` : '';
-  const resp = await fetch(`/api/batch/${batchId}/items${params}`);
+  const resp = await authFetch(`/api/batch/${batchId}/items${params}`);
   if (!resp.ok) throw new Error(`Failed to fetch batch items (${resp.status})`);
   return resp.json();
 }
@@ -74,7 +88,7 @@ export async function reviewItem(
   reviewStatus: 'accepted' | 'skipped' | 'wrong',
   acceptedReleaseId?: number,
 ): Promise<void> {
-  const resp = await fetch(`/api/batch/${batchId}/items/${itemId}`, {
+  const resp = await authFetch(`/api/batch/${batchId}/items/${itemId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -96,7 +110,7 @@ export async function getAllReviewItems(
   if (reviewStatus) query.set('review_status', reviewStatus);
   if (status) query.set('status', status);
   const qs = query.toString();
-  const resp = await fetch(`/api/review/items${qs ? `?${qs}` : ''}`);
+  const resp = await authFetch(`/api/review/items${qs ? `?${qs}` : ''}`);
   if (!resp.ok) throw new Error(`Failed to fetch review items (${resp.status})`);
   return resp.json();
 }
@@ -106,7 +120,7 @@ export async function reviewItemGlobal(
   reviewStatus: 'accepted' | 'skipped' | 'wrong',
   acceptedReleaseId?: number,
 ): Promise<void> {
-  const resp = await fetch(`/api/review/items/${itemId}`, {
+  const resp = await authFetch(`/api/review/items/${itemId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -119,7 +133,7 @@ export async function reviewItemGlobal(
 }
 
 export async function undoReviewItem(itemId: string): Promise<void> {
-  const resp = await fetch(`/api/review/items/${itemId}/undo`, {
+  const resp = await authFetch(`/api/review/items/${itemId}/undo`, {
     method: 'POST',
   });
 
@@ -127,7 +141,7 @@ export async function undoReviewItem(itemId: string): Promise<void> {
 }
 
 export async function retryItem(itemId: string): Promise<void> {
-  const resp = await fetch(`/api/review/items/${itemId}/retry`, {
+  const resp = await authFetch(`/api/review/items/${itemId}/retry`, {
     method: 'POST',
   });
 
@@ -153,7 +167,7 @@ export async function getCollection(
     sort_order: sortOrder,
   });
   if (search.trim()) params.set('q', search.trim());
-  const resp = await fetch(`/api/collection?${params}`);
+  const resp = await authFetch(`/api/collection?${params}`);
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to fetch collection (${resp.status})`);
@@ -162,7 +176,7 @@ export async function getCollection(
 }
 
 export async function triggerCollectionSync(): Promise<{ message: string }> {
-  const resp = await fetch('/api/collection/sync', { method: 'POST' });
+  const resp = await authFetch('/api/collection/sync', { method: 'POST' });
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to trigger sync (${resp.status})`);
@@ -171,7 +185,7 @@ export async function triggerCollectionSync(): Promise<{ message: string }> {
 }
 
 export async function getCollectionSyncStatus(): Promise<SyncStatus> {
-  const resp = await fetch('/api/collection/sync');
+  const resp = await authFetch('/api/collection/sync');
   if (!resp.ok) throw new Error(`Failed to fetch sync status (${resp.status})`);
   return resp.json();
 }
@@ -179,30 +193,30 @@ export async function getCollectionSyncStatus(): Promise<SyncStatus> {
 // ── Price ─────────────────────────────────────────────────────────────────
 
 export async function getPrice(releaseId: number): Promise<{ lowest_price: number | null; num_for_sale: number; currency: string | null }> {
-  const resp = await fetch(`/api/price/${releaseId}`);
+  const resp = await authFetch(`/api/price/${releaseId}`);
   if (!resp.ok) return { lowest_price: null, num_for_sale: 0, currency: null };
   return resp.json();
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+// ── Discogs OAuth ────────────────────────────────────────────────────────
 
-export async function getAuthStatus(): Promise<AuthStatus> {
-  const resp = await fetch('/api/auth/status');
-  if (!resp.ok) throw new Error(`Failed to fetch auth status (${resp.status})`);
+export async function getDiscogsStatus(): Promise<DiscogsStatus> {
+  const resp = await authFetch('/api/discogs/status');
+  if (!resp.ok) throw new Error(`Failed to fetch Discogs status (${resp.status})`);
   return resp.json();
 }
 
-export async function startOAuthLogin(): Promise<string> {
-  const resp = await fetch('/api/auth/login');
+export async function startDiscogsLogin(): Promise<string> {
+  const resp = await authFetch('/api/discogs/login');
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
-    throw new Error(body?.detail ?? `Failed to start login (${resp.status})`);
+    throw new Error(body?.detail ?? `Failed to start Discogs login (${resp.status})`);
   }
   const data = await resp.json();
   return data.authorize_url;
 }
 
-export async function logout(): Promise<void> {
-  const resp = await fetch('/api/auth/logout', { method: 'POST' });
-  if (!resp.ok) throw new Error(`Failed to logout (${resp.status})`);
+export async function discogsLogout(): Promise<void> {
+  const resp = await authFetch('/api/discogs/logout', { method: 'POST' });
+  if (!resp.ok) throw new Error(`Failed to disconnect Discogs (${resp.status})`);
 }
