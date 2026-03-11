@@ -331,10 +331,10 @@ h2, h3 {
   width: 2.5rem;
   height: 2.5rem;
   background: var(--text-secondary);
-  mask-image: url('./assets/vinyl.svg');
+  mask-image: url('./assets/vinyl-spinner.svg');
   mask-size: contain;
   mask-repeat: no-repeat;
-  -webkit-mask-image: url('./assets/vinyl.svg');
+  -webkit-mask-image: url('./assets/vinyl-spinner.svg');
   -webkit-mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   animation: spin 1.2s linear infinite;
@@ -1202,8 +1202,8 @@ h2, h3 {
   height: 40%;
   background-color: var(--text-secondary);
   opacity: 0.3;
-  -webkit-mask-image: url('./assets/vinyl.svg');
-  mask-image: url('./assets/vinyl.svg');
+  -webkit-mask-image: url('./assets/vinyl-spinner.svg');
+  mask-image: url('./assets/vinyl-spinner.svg');
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
