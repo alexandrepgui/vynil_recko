@@ -133,6 +133,75 @@ h2, h3 {
   animation: fadeIn 0.2s ease;
 }
 
+/* ── Identify sub-tabs ────────────────────────────────────────────────── */
+
+.identify-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.identify-subtabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.identify-subtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.85rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.subtab-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+.identify-subtab.active .subtab-icon {
+  opacity: 0.8;
+}
+
+.identify-subtab:hover {
+  color: var(--text-primary);
+}
+
+.identify-subtab.active {
+  color: var(--accent-text, var(--accent));
+  border-bottom-color: var(--accent);
+}
+
+/* Badge counter on sub-tabs */
+.subtab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-left: 0.25rem;
+}
+
 /* ── OLD header (kept for public collection page) ──────────────────────── */
 
 .app-header {
@@ -426,14 +495,15 @@ h2, h3 {
   opacity: 0.85;
 }
 
-/* Collection / Accept — amber */
+/* Collection / Accept — amber outline */
 .btn-collection {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
 }
 
 .btn-collection:hover {
-  background: var(--accent-hover);
+  background: var(--accent-subtle);
 }
 
 /* Secondary — ghost with border */
@@ -719,12 +789,13 @@ h2, h3 {
 /* ── Dismiss / Danger buttons ──────────────────────────────────────────── */
 
 .btn-dismiss {
-  background: var(--danger);
-  color: var(--on-danger);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--text-secondary);
 }
 
 .btn-dismiss:hover {
-  opacity: 0.9;
+  background: rgba(92, 79, 106, 0.08);
 }
 
 /* ── Navigation buttons (secondary style) ──────────────────────────────── */
@@ -931,12 +1002,13 @@ h2, h3 {
 /* ── Wrong button ──────────────────────────────────────────────────────── */
 
 .btn-wrong {
-  background: var(--danger);
-  color: var(--on-danger);
+  background: transparent;
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
 }
 
 .btn-wrong:hover {
-  opacity: 0.9;
+  background: var(--danger-subtle);
 }
 
 /* ── Issues view ───────────────────────────────────────────────────────── */
@@ -1118,18 +1190,25 @@ h2, h3 {
 
 .collection-cover-placeholder {
   background: var(--surface);
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.collection-cover-placeholder::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url('./assets/icon.svg');
-  background-size: 40%;
-  background-repeat: no-repeat;
-  background-position: center;
-  opacity: 0.15;
+.collection-cover-placeholder-icon {
+  display: block;
+  width: 40%;
+  height: 40%;
+  background-color: var(--text-secondary);
+  opacity: 0.3;
+  -webkit-mask-image: url('./assets/vinyl.svg');
+  mask-image: url('./assets/vinyl.svg');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .collection-card-info {
@@ -1800,6 +1879,124 @@ h2, h3 {
   background: var(--accent-subtle);
 }
 
+/* ── Skeleton loading for collection grid ────────────────────────────── */
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--border) 50%, transparent 100%);
+  animation: shimmer 1.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  border-radius: 0;
+}
+
+.skeleton-info {
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.skeleton-bar {
+  height: 0.7rem;
+  border-radius: 3px;
+}
+
+.skeleton-bar-long {
+  width: 85%;
+}
+
+.skeleton-bar-medium {
+  width: 60%;
+}
+
+.skeleton-bar-short {
+  width: 40%;
+}
+
+/* ── Toast notifications ─────────────────────────────────────────────────── */
+
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--surface, #ECD5B8);
+  color: var(--text-primary, #1A1520);
+  padding: 0.75rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 12px rgba(26, 23, 20, 0.12);
+  border-left: 2px solid var(--accent, #2B1BDF);
+  pointer-events: auto;
+  animation: toast-fade-in 0.25s ease-out;
+}
+
+.toast-success {
+  border-left-color: var(--accent, #2B1BDF);
+}
+
+.toast-error {
+  border-left-color: var(--danger, #F31C05);
+}
+
+.toast-removing {
+  animation: toast-fade-out 0.3s ease-in forwards;
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* ── Mobile responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
@@ -1828,5 +2025,15 @@ h2, h3 {
 
   .collection-controls {
     gap: 0.5rem;
+  }
+
+  .identify-subtab {
+    padding: 0.4rem 0.55rem;
+    font-size: 0.78rem;
+  }
+
+  .subtab-icon {
+    width: 14px;
+    height: 14px;
   }
 }

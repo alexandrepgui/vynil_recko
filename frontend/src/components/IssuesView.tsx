@@ -3,7 +3,11 @@ import { getAllReviewItems, reviewItemGlobal, retryItem } from '../api';
 import type { BatchItem } from '../types';
 import ZoomableImage from './ZoomableImage';
 
-export default function IssuesView() {
+interface IssuesViewProps {
+  onCountChange?: () => void;
+}
+
+export default function IssuesView({ onCountChange }: IssuesViewProps) {
   const [wrongItems, setWrongItems] = useState<BatchItem[]>([]);
   const [errorItems, setErrorItems] = useState<BatchItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +45,7 @@ export default function IssuesView() {
     try {
       await reviewItemGlobal(itemId, 'skipped');
       removeItem(itemId);
+      onCountChange?.();
     } finally {
       setActionLoading(null);
     }
@@ -51,6 +56,7 @@ export default function IssuesView() {
     try {
       await retryItem(itemId);
       removeItem(itemId);
+      onCountChange?.();
     } finally {
       setActionLoading(null);
     }

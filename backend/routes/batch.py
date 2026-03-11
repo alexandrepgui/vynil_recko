@@ -80,7 +80,7 @@ def _process_batch(
             repo.increment_batch_failed(batch_id)
         except Exception as e:
             log.error("Batch item %s failed: %s", item_id, e, exc_info=True)
-            repo.update_item_error(item_id, "Search pipeline error. Check server logs for details.")
+            repo.update_item_error(item_id, "Something went wrong processing this image. Try again?")
             repo.increment_batch_failed(batch_id)
             record.status = "error_pipeline"
         finally:
@@ -245,7 +245,7 @@ def _reprocess_item(
         repo.update_item_error(item_id, str(e))
     except Exception as e:
         log.error("Retry item %s failed: %s", item_id, e, exc_info=True)
-        repo.update_item_error(item_id, "Search pipeline error. Check server logs for details.")
+        repo.update_item_error(item_id, "Something went wrong processing this image. Try again?")
 
 
 @router.post("/api/review/items/{item_id}/retry")

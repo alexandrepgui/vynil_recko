@@ -55,12 +55,15 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const [settingsError, setSettingsError] = useState(false);
+
   const fetchSettings = useCallback(async () => {
     try {
       setSettings(await getSettings());
     } catch {
-      // Settings not available, use defaults
+      // Fall back to defaults but warn the user
       setSettings({ collection_public: false });
+      setSettingsError(true);
     }
   }, []);
 
@@ -240,6 +243,9 @@ export default function ProfilePage() {
 
       <div className="profile-section">
         <h3 className="profile-section-title">Collection</h3>
+        {settingsError && (
+          <p className="error">Couldn't load your settings. They may not reflect your current preferences.</p>
+        )}
         <div className="profile-visibility-row">
           <div className="profile-visibility-info">
             <span className="profile-visibility-label">Collection visibility</span>

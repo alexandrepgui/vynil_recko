@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import hideIcon from '../assets/hide.svg';
-import viewIcon from '../assets/view.svg';
 import logoIcon from '../assets/icon.svg';
 import logoImg from '../assets/logo.svg';
+import { HideIcon, ViewIcon } from './Icons';
 import { supabase } from '../supabaseClient';
 
 type Mode = 'login' | 'signup';
@@ -94,7 +93,7 @@ export default function LoginPage() {
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              <img src={showPassword ? hideIcon : viewIcon} alt="" width={20} height={20} />
+              {showPassword ? <HideIcon aria-hidden="true" /> : <ViewIcon aria-hidden="true" />}
             </button>
           </div>
           <button type="submit" className="btn btn-primary" disabled={loading}>

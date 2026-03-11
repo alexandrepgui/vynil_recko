@@ -8,6 +8,7 @@ Provides endpoints for:
 """
 
 import os
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -24,6 +25,35 @@ from services.discogs_auth import (
 )
 
 log = get_logger("routes.discogs_oauth")
+
+# Hosts allowed for redirect URLs.  Extend with your production domain(s).
+ALLOWED_FRONTEND_HOSTS: set[str] = {"localhost", "127.0.0.1"}
+ALLOWED_CALLBACK_HOSTS: set[str] = {"localhost", "127.0.0.1"}
+
+_DEFAULT_FRONTEND_URL = "http://localhost:5173"
+_DEFAULT_CALLBACK_URL: str | None = None  # fall back to request.url_for()
+
+
+def validate_redirect_url(
+    url: str,
+    allowed_hosts: set[str],
+    allow_http: bool = False,
+) -> bool:
+    """Return True if *url* has an allowed scheme and hostname.
+
+    - ``https`` is always accepted when the hostname is in *allowed_hosts*.
+    - ``http`` is only accepted when *allow_http* is True (dev / localhost).
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme == "https":
+            return parsed.hostname in allowed_hosts
+        if parsed.scheme == "http" and allow_http:
+            return parsed.hostname in allowed_hosts
+        return False
+    except Exception:
+        return False
+
 
 router = APIRouter(prefix="/api/discogs", tags=["discogs"])
 
@@ -54,7 +84,13 @@ async def discogs_login(
             detail="Discogs OAuth not configured. Set DISCOGS_CONSUMER_KEY and DISCOGS_CONSUMER_SECRET in .env",
         )
 
-    callback_url = os.getenv("OAUTH_CALLBACK_URL") or str(request.url_for("discogs_callback"))
+    callback_url = os.getenv("OAUTH_CALLBACK_URL") or _DEFAULT_CALLBACK_URL
+    if callback_url and not validate_redirect_url(callback_url, ALLOWED_CALLBACK_HOSTS, allow_http=True):
+        log.warning("Invalid OAUTH_CALLBACK_URL ignored: %s", callback_url)
+        callback_url = None
+    # Fall back to auto-detected callback from the request
+    if not callback_url:
+        callback_url = str(request.url_for("discogs_callback"))
     log.info("Starting Discogs OAuth for user_id=%s callback=%s", user.id, callback_url)
 
     try:
@@ -98,7 +134,10 @@ async def discogs_callback(
     log.info("Discogs OAuth completed for user_id=%s username=%s", user_id, tokens.username)
 
     # Redirect back to the frontend app
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    frontend_url = os.getenv("FRONTEND_URL", _DEFAULT_FRONTEND_URL)
+    if not validate_redirect_url(frontend_url, ALLOWED_FRONTEND_HOSTS, allow_http=True):
+        log.warning("Invalid FRONTEND_URL ignored: %s", frontend_url)
+        frontend_url = _DEFAULT_FRONTEND_URL
     return RedirectResponse(url=frontend_url)
 
 

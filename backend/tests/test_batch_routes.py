@@ -296,7 +296,7 @@ def test_process_batch_item_failure():
     ):
         _process_batch("b1", items, filenames, user_id="u1")
 
-    repo.update_item_error.assert_called_once_with("item1", "Search pipeline error. Check server logs for details.")
+    repo.update_item_error.assert_called_once_with("item1", "Something went wrong processing this image. Try again?")
     repo.increment_batch_failed.assert_called_once_with("b1")
     repo.update_batch_status.assert_called_once_with("b1", "completed")
 
@@ -414,4 +414,4 @@ def test_reprocess_item_unexpected_error():
     ):
         _reprocess_item("i1", b"jpeg-data", "image/jpeg", user_id="u1")
 
-    repo.update_item_error.assert_called_once_with("i1", "Search pipeline error. Check server logs for details.")
+    repo.update_item_error.assert_called_once_with("i1", "Something went wrong processing this image. Try again?")

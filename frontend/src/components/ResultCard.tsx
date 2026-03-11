@@ -16,12 +16,13 @@ interface Props {
 export default function ResultCard({ result, itemId, renderActions, className }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'added' | 'error' | 'dismissed'>('idle');
   const [price, setPrice] = useState<{ lowest_price: number | null; num_for_sale: number; currency: string | null } | null>(null);
+  const [priceFailed, setPriceFailed] = useState(false);
 
   const { artist, album: albumTitle } = parseDiscogsTitle(result.title);
 
   useEffect(() => {
     if (!result.discogs_id) return;
-    getPrice(result.discogs_id).then(setPrice).catch(() => {});
+    getPrice(result.discogs_id).then(setPrice).catch(() => setPriceFailed(true));
   }, [result.discogs_id]);
 
   const handleAddToCollection = async () => {
@@ -85,9 +86,11 @@ export default function ResultCard({ result, itemId, renderActions, className }:
           {result.format && <span>{result.format}</span>}
           {result.label && <span>{result.label}</span>}
           {result.catno && <span>Cat# {result.catno}</span>}
-          {price?.lowest_price != null && (
+          {priceFailed ? (
+            <span className="result-price result-price-unavailable">Price unavailable</span>
+          ) : price?.lowest_price != null ? (
             <span className="result-price">From {price.lowest_price.toFixed(2)} {price.currency ?? ''} ({price.num_for_sale} for sale)</span>
-          )}
+          ) : null}
         </div>
 
         {renderActions ? (

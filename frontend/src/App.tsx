@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { searchByImage } from './api';
+import { getAllReviewItems, getCollectionSyncStatus, searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
+import { ToastProvider } from './components/Toast';
 import ImageUpload from './components/ImageUpload';
 import LoginPage from './components/LoginPage';
 import MediaTypeSelector from './components/MediaTypeSelector';
@@ -15,6 +16,10 @@ import CollectionView from './components/CollectionView';
 import ProfilePage from './components/ProfilePage';
 import vinylIcon from './assets/vinyl.svg';
 import cdIcon from './assets/cd.svg';
+import singleSearchIcon from './assets/single-search.svg';
+import batchIcon from './assets/batch.svg';
+import reviewIcon from './assets/review.svg';
+import issuesIcon from './assets/issues.svg';
 import logoImg from './assets/logo.svg';
 import logoIcon from './assets/icon.svg';
 
@@ -119,6 +124,63 @@ function SingleSearchPage() {
   );
 }
 
+function IdentifyPage() {
+  const navigate = useNavigate();
+  const [reviewCount, setReviewCount] = useState(0);
+  const [issuesCount, setIssuesCount] = useState(0);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [reviewItems, wrongItems, errorItems] = await Promise.all([
+        getAllReviewItems('unreviewed'),
+        getAllReviewItems('wrong'),
+        getAllReviewItems('unreviewed', 'error'),
+      ]);
+      setReviewCount(reviewItems.length);
+      setIssuesCount(wrongItems.length + errorItems.length);
+    } catch {
+      // Silently ignore count fetch failures
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCounts();
+  }, [fetchCounts]);
+
+  return (
+    <div className="identify-page">
+      <div className="identify-subtabs">
+        <NavLink to="/identify" end className={({ isActive }) => `identify-subtab${isActive ? ' active' : ''}`}>
+          <img src={singleSearchIcon} alt="" className="subtab-icon" />
+          Search
+        </NavLink>
+        <NavLink to="/identify/batch" className={({ isActive }) => `identify-subtab${isActive ? ' active' : ''}`}>
+          <img src={batchIcon} alt="" className="subtab-icon" />
+          Batch
+        </NavLink>
+        <NavLink to="/identify/review" className={({ isActive }) => `identify-subtab${isActive ? ' active' : ''}`}>
+          <img src={reviewIcon} alt="" className="subtab-icon" />
+          Review
+          {reviewCount > 0 && <span className="subtab-badge">{reviewCount}</span>}
+        </NavLink>
+        <NavLink to="/identify/issues" className={({ isActive }) => `identify-subtab${isActive ? ' active' : ''}`}>
+          <img src={issuesIcon} alt="" className="subtab-icon" />
+          Issues
+          {issuesCount > 0 && <span className="subtab-badge">{issuesCount}</span>}
+        </NavLink>
+      </div>
+
+      <Routes>
+        <Route index element={<SingleSearchPage />} />
+        <Route path="batch" element={<BatchView onGoToReview={() => navigate('/identify/review')} />} />
+        <Route path="review" element={<ReviewView onCountChange={fetchCounts} />} />
+        <Route path="issues" element={<IssuesView onCountChange={fetchCounts} />} />
+        <Route path="*" element={<Navigate to="/identify" replace />} />
+      </Routes>
+    </div>
+  );
+}
+
 function PublicCollectionPage() {
   const { username } = useParams<{ username: string }>();
   if (!username) return <p className="error">We need a username to show this collection.</p>;
@@ -135,8 +197,27 @@ function PublicCollectionPage() {
   );
 }
 
+function SmartRedirect() {
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCollectionSyncStatus()
+      .then((status) => {
+        setTarget(status.completed_at ? '/collection' : '/identify');
+      })
+      .catch(() => {
+        setTarget('/identify');
+      });
+  }, []);
+
+  if (!target) {
+    return <div className="loading"><div className="spinner" /></div>;
+  }
+
+  return <Navigate to={target} replace />;
+}
+
 function AppInner() {
-  const navigate = useNavigate();
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -166,12 +247,6 @@ function AppInner() {
           <NavLink to="/collection" className="nav-link">
             Collection
           </NavLink>
-          <NavLink to="/review" className="nav-link">
-            Review
-          </NavLink>
-          <NavLink to="/issues" className="nav-link">
-            Issues
-          </NavLink>
         </div>
 
         <div className="navbar-spacer" />
@@ -190,14 +265,16 @@ function AppInner() {
 
       <div className="route-content">
         <Routes>
-          <Route path="/" element={<Navigate to="/collection" replace />} />
-          <Route path="/identify" element={<SingleSearchPage />} />
-          <Route path="/batch" element={<BatchView onGoToReview={() => navigate('/review')} />} />
-          <Route path="/review" element={<ReviewView />} />
-          <Route path="/issues" element={<IssuesView />} />
+          <Route path="/" element={<SmartRedirect />} />
+          <Route path="/identify/*" element={<IdentifyPage />} />
           <Route path="/collection" element={<CollectionView />} />
           <Route path="/profile" element={<ProfilePage />} />
+          {/* Redirects: old routes and login */}
+          <Route path="/batch" element={<Navigate to="/identify/batch" replace />} />
+          <Route path="/review" element={<Navigate to="/identify/review" replace />} />
+          <Route path="/issues" element={<Navigate to="/identify/issues" replace />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/identify" replace />} />
         </Routes>
       </div>
     </div>
@@ -208,10 +285,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/collection/:username" element={<PublicCollectionPage />} />
-          <Route path="/*" element={<AppInner />} />
-        </Routes>
+        <ToastProvider>
+          <Routes>
+            <Route path="/collection/:username" element={<PublicCollectionPage />} />
+            <Route path="/*" element={<AppInner />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

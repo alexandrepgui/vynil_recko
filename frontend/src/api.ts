@@ -253,7 +253,7 @@ export async function updateSettings(settings: Partial<UserSettings>): Promise<U
 
 export async function getPrice(releaseId: number): Promise<{ lowest_price: number | null; num_for_sale: number; currency: string | null }> {
   const resp = await authFetch(`/api/price/${releaseId}`);
-  if (!resp.ok) return { lowest_price: null, num_for_sale: 0, currency: null };
+  if (!resp.ok) throw new Error('Price unavailable');
   return resp.json();
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getProfile, getPublicCollection, getSettings, triggerCollectionSync } from '../api';
 import type { CollectionItem, SyncStatus } from '../types';
+import { useToast } from './Toast';
 import ZoomableImage from './ZoomableImage';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 150, 200, 250];
@@ -71,12 +72,12 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
 
   // Copy link state (only used in authenticated view)
   const [collectionPublic, setCollectionPublic] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [discogsUsername, setDiscogsUsername] = useState<string | null>(null);
+
+  const { showToast } = useToast();
 
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
@@ -267,23 +268,20 @@ export default function CollectionView({ readOnly = false, username }: Collectio
 
   const handleDeleteSelected = async () => {
     setDeleting(true);
-    setDeleteMessage(null);
     try {
       const result = await deleteCollectionItems(Array.from(selectedIds));
-      const msgs: string[] = [];
       if (result.deleted > 0) {
-        msgs.push(`${result.deleted} record${result.deleted !== 1 ? 's' : ''} deleted.`);
+        showToast(`Deleted ${result.deleted} record${result.deleted !== 1 ? 's' : ''}`);
       }
       if (result.errors.length > 0) {
-        msgs.push(`${result.errors.length} couldn't be removed.`);
+        showToast(`${result.errors.length} failed to delete`, 'error');
       }
-      setDeleteMessage(msgs.join(' '));
       setSelectedIds(new Set());
       setShowDeleteModal(false);
       // Refresh the current page
       fetchCollection(page, pageSize, sort, sortOrder, debouncedSearch);
     } catch (e) {
-      setDeleteMessage(e instanceof Error ? e.message : 'Couldn\'t delete that. Try again?');
+      showToast(e instanceof Error ? e.message : 'Delete failed.', 'error');
       setShowDeleteModal(false);
     } finally {
       setDeleting(false);
@@ -303,15 +301,9 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const handleCopyLink = () => {
     if (!discogsUsername) return;
     const url = `${window.location.origin}/collection/${discogsUsername}`;
-    navigator.clipboard.writeText(url).then(
-      () => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000);
-      },
-      () => {
-        setError('Failed to copy link to clipboard.');
-      },
-    );
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Link copied');
+    });
   };
 
   // Landing: never synced and not currently syncing (only for authenticated view)
@@ -416,16 +408,12 @@ export default function CollectionView({ readOnly = false, username }: Collectio
             onClick={handleCopyLink}
             title="Copy public collection link"
           >
-            {copySuccess ? 'Copied!' : 'Copy link'}
+            Copy link
           </button>
         )}
       </div>
 
       {error && <p className="error">{error}</p>}
-
-      {!readOnly && deleteMessage && (
-        <p className="collection-delete-message">{deleteMessage}</p>
-      )}
 
       {!readOnly && selectedIds.size > 0 && (
         <div className="collection-selection-toolbar">
@@ -448,9 +436,17 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       )}
 
       {loading && (
-        <div className="loading">
-          <div className="spinner" />
-          <p>Loading collection...</p>
+        <div className="collection-grid collection-skeleton-grid" aria-hidden="true" ref={gridRef}>
+          {Array.from({ length: Math.min(pageSize, 25) }, (_, i) => (
+            <div key={i} className="collection-card skeleton-card">
+              <div className="skeleton-cover skeleton-shimmer" />
+              <div className="skeleton-info">
+                <div className="skeleton-bar skeleton-bar-long skeleton-shimmer" />
+                <div className="skeleton-bar skeleton-bar-medium skeleton-shimmer" />
+                <div className="skeleton-bar skeleton-bar-short skeleton-shimmer" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -492,7 +488,9 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                     loading="lazy"
                   />
                 ) : (
-                  <div className="collection-cover collection-cover-placeholder" />
+                  <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
+                    <div className="collection-cover-placeholder-icon" aria-hidden="true" />
+                  </div>
                 )}
                 <div className="collection-card-info">
                   <div className="collection-card-title">{item.title}</div>

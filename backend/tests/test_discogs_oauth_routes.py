@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import TEST_USER_ID
+from routes.discogs_oauth import validate_redirect_url
 
 
 @pytest.fixture(autouse=True)
@@ -125,3 +126,142 @@ class TestDiscogsLogout:
         resp = test_client.post("/api/discogs/logout")
         assert resp.status_code == 200
         mock_repo.delete_oauth_tokens.assert_called_once_with(TEST_USER_ID)
+
+
+# ── validate_redirect_url unit tests ────────────────────────────────────────
+
+
+class TestValidateRedirectUrl:
+    """Tests for the redirect URL validation helper."""
+
+    HOSTS = {"localhost", "127.0.0.1"}
+
+    def test_https_allowed_host(self):
+        assert validate_redirect_url("https://localhost/path", self.HOSTS) is True
+
+    def test_https_disallowed_host(self):
+        assert validate_redirect_url("https://evil.com/path", self.HOSTS) is False
+
+    def test_http_rejected_by_default(self):
+        assert validate_redirect_url("http://localhost:5173", self.HOSTS) is False
+
+    def test_http_allowed_when_flag_set(self):
+        assert validate_redirect_url("http://localhost:5173", self.HOSTS, allow_http=True) is True
+
+    def test_http_disallowed_host_even_with_flag(self):
+        assert validate_redirect_url("http://evil.com", self.HOSTS, allow_http=True) is False
+
+    def test_ftp_scheme_rejected(self):
+        assert validate_redirect_url("ftp://localhost/file", self.HOSTS, allow_http=True) is False
+
+    def test_empty_string(self):
+        assert validate_redirect_url("", self.HOSTS, allow_http=True) is False
+
+    def test_no_scheme(self):
+        assert validate_redirect_url("localhost:5173", self.HOSTS, allow_http=True) is False
+
+    def test_javascript_scheme(self):
+        assert validate_redirect_url("javascript:alert(1)", self.HOSTS, allow_http=True) is False
+
+    def test_ip_address_allowed(self):
+        assert validate_redirect_url("http://127.0.0.1:5173", self.HOSTS, allow_http=True) is True
+
+
+# ── Redirect validation integration tests ───────────────────────────────────
+
+
+class TestCallbackRedirectValidation:
+    """The /callback endpoint should fall back to the default URL when FRONTEND_URL is invalid."""
+
+    @patch("services.discogs_auth._auth_session.post")
+    @patch("services.discogs._session.get")
+    def test_invalid_frontend_url_falls_back(self, mock_identity, mock_post, client, monkeypatch):
+        test_client, mock_repo = client
+        monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
+        monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")
+        monkeypatch.setenv("FRONTEND_URL", "ftp://evil.com")
+
+        import services.discogs_auth as mod
+        from services.discogs_auth import PendingOAuth
+
+        mod._pending["tok"] = PendingOAuth(
+            user_id=TEST_USER_ID,
+            request_token="tok", request_token_secret="sec",
+        )
+
+        mock_post.return_value.text = "oauth_token=access&oauth_token_secret=access_sec"
+        mock_post.return_value.raise_for_status.return_value = None
+
+        mock_identity.return_value.json.return_value = {"username": "dj_vinyl"}
+        mock_identity.return_value.raise_for_status.return_value = None
+
+        resp = test_client.get(
+            "/api/discogs/callback",
+            params={"oauth_token": "tok", "oauth_verifier": "ver"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 307
+        # Should fall back to default localhost URL
+        assert "localhost:5173" in resp.headers["location"]
+
+    @patch("services.discogs_auth._auth_session.post")
+    @patch("services.discogs._session.get")
+    def test_valid_frontend_url_used(self, mock_identity, mock_post, client, monkeypatch):
+        test_client, mock_repo = client
+        monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
+        monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")
+        monkeypatch.setenv("FRONTEND_URL", "http://localhost:3000")
+
+        import services.discogs_auth as mod
+        from services.discogs_auth import PendingOAuth
+
+        mod._pending["tok"] = PendingOAuth(
+            user_id=TEST_USER_ID,
+            request_token="tok", request_token_secret="sec",
+        )
+
+        mock_post.return_value.text = "oauth_token=access&oauth_token_secret=access_sec"
+        mock_post.return_value.raise_for_status.return_value = None
+
+        mock_identity.return_value.json.return_value = {"username": "dj_vinyl"}
+        mock_identity.return_value.raise_for_status.return_value = None
+
+        resp = test_client.get(
+            "/api/discogs/callback",
+            params={"oauth_token": "tok", "oauth_verifier": "ver"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 307
+        assert "localhost:3000" in resp.headers["location"]
+
+
+class TestLoginCallbackUrlValidation:
+    """The /login endpoint should fall back when OAUTH_CALLBACK_URL is invalid."""
+
+    @patch("services.discogs_auth._auth_session.get")
+    def test_invalid_callback_url_falls_back_to_auto(self, mock_get, client, monkeypatch):
+        test_client, _ = client
+        monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
+        monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")
+        monkeypatch.setenv("OAUTH_CALLBACK_URL", "javascript:alert(1)")
+
+        mock_get.return_value.text = "oauth_token=tok&oauth_token_secret=sec&oauth_callback_confirmed=true"
+        mock_get.return_value.raise_for_status.return_value = None
+
+        resp = test_client.get("/api/discogs/login")
+        assert resp.status_code == 200
+        assert "authorize_url" in resp.json()
+
+    @patch("services.discogs_auth._auth_session.get")
+    def test_valid_callback_url_used(self, mock_get, client, monkeypatch):
+        test_client, _ = client
+        monkeypatch.setenv("DISCOGS_CONSUMER_KEY", "k")
+        monkeypatch.setenv("DISCOGS_CONSUMER_SECRET", "s")
+        monkeypatch.setenv("OAUTH_CALLBACK_URL", "http://localhost:8000/api/discogs/callback")
+
+        mock_get.return_value.text = "oauth_token=tok&oauth_token_secret=sec&oauth_callback_confirmed=true"
+        mock_get.return_value.raise_for_status.return_value = None
+
+        resp = test_client.get("/api/discogs/login")
+        assert resp.status_code == 200
+        assert "authorize_url" in resp.json()
