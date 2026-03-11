@@ -8,17 +8,75 @@
 
 ## Backlog
 
+### T15: Update Navbar - Logo/Brand Left, Profile Picture Right
+
+**Goal:** Move logo and app name to the left side of the navbar. Replace current logo position with user's profile picture. Clicking logo/brand should redirect to home page.
+
+**Details:**
+- Navbar left side: app icon + "Groove Log" wordmark side by side
+- Navbar right side: user's profile avatar (circular, with hover effect)
+- Logo/brand link should navigate to "/" (home/identify page)
+- Profile avatar maintains existing click behavior (goes to /profile)
+
+**Files to modify:**
+- `frontend/src/App.tsx` — navbar structure update
+- `frontend/src/App.css` — navbar layout styles, logo/brand spacing, avatar positioning
+
+---
+
+### T16: Collection Page - Grouping Options
+
+**Goal:** Add grouping options to collection page allowing users to group records by artist, country, or genre. Ensure groups are not broken across page boundaries.
+
+**Details:**
+- Add group selector (dropdown or tabs): Artist / Country / Genre / None
+- When grouped, records display in sections with headers for each group
+- Pagination must respect group boundaries - don't split a group across pages
+- Group headers should show group name and record count
+- Maintain existing search and sort functionality (sorting may be disabled when grouped by certain fields)
+- Store group preference in localStorage
+
+**Files to modify:**
+- `frontend/src/components/CollectionView.tsx` — group state, grouping logic, section rendering
+- `frontend/src/App.css` — group header styles
+- `frontend/src/api.ts` — may need new query params for grouped fetching
+- `frontend/src/types.ts` — update CollectionResponse types if needed
+
+---
+
+### T17: Collection Page - Record Card Context Menu
+
+**Goal:** When clicking on a record card (outside the cover image area), open a context menu/dialog with options like delete, view on Discogs, view pricing, etc.
+
+**Details:**
+- Click anywhere on card except cover image opens action dialog
+- Dialog options:
+  - View on Discogs (opens new tab to Discogs release page)
+  - View Pricing (opens Discogs marketplace pricing)
+  - Delete from Collection (opens confirmation, then deletes)
+  - Cancel
+- Dialog should show record title/artist for context
+- Maintain existing multi-select behavior (checkbox in corner unaffected)
+- Style dialog as modal with backdrop blur
+
+**Files to modify:**
+- `frontend/src/components/CollectionView.tsx` — click handler, dialog state, dialog component
+- `frontend/src/App.css` — context menu dialog styles
+- `frontend/src/api.ts` — Discogs URL helpers if needed
+
+---
+
 ### T9: Configure Supabase Cloud & Google OAuth (Manual)
 
 **Goal:** Set up production-ready Supabase project with Google sign-in provider. This is a manual task — no code changes needed.
 
 **Steps:**
 1. Create a Supabase project at [supabase.com](https://supabase.com)
-2. Copy the **Project URL**, **anon key**, and **JWT secret** (Settings → API → JWT Settings)
+2. Copy to **Project URL**, **anon key**, and **JWT secret** (Settings → API → JWT Settings)
 3. Enable Google provider in Authentication → Providers → Google:
    - Create a Google OAuth app in [Google Cloud Console](https://console.cloud.google.com) (APIs & Services → Credentials → OAuth 2.0 Client ID, type "Web application")
    - Set authorized redirect URI to `https://<your-project>.supabase.co/auth/v1/callback`
-   - Paste the Google Client ID and Client Secret into the Supabase Google provider settings
+   - Paste to Google Client ID and Client Secret into Supabase Google provider settings
 4. Set Site URL in Authentication → URL Configuration to your frontend URL (e.g. `http://localhost:5173` for dev). Add it to Redirect URLs too.
 5. Update `.env` with production values:
    ```
@@ -26,7 +84,7 @@
    VITE_SUPABASE_URL=https://<your-project>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-anon-key>
    ```
-6. Test: sign up via the login page → verify email → log in → confirm API calls work
+6. Test: sign up via login page → verify email → log in → confirm API calls work
 
 **Note:** Local dev already works with `make dev` (uses Supabase CLI). This ticket is for production/cloud setup only.
 
@@ -38,9 +96,15 @@ _(empty)_
 
 ## Awaiting Validation
 
+_(empty)_
+
+---
+
+## Finished
+
 ### T11: Full-Width Responsive Layout
 
-**Goal:** Remove the fixed `max-width: 860px` container so all pages use the full viewport width and adapt to any screen size.
+**Goal:** Remove fixed `max-width: 860px` container so all pages use full viewport width and adapt to any screen size.
 
 **Files modified:**
 - `frontend/src/App.css` — replaced `max-width: 860px` with `padding: 2rem clamp(1rem, 3vw, 4rem)` on `.app`
@@ -51,7 +115,7 @@ _(empty)_
 
 **Depends on:** T11
 
-**Goal:** Let users choose how many records per page (up to 250) and make the grid dynamically adapt columns-per-row so the last row is always full (or as close as possible).
+**Goal:** Let users choose how many records per page (up to 250) and make grid dynamically adapt columns-per-row so last row is always full (or as close as possible).
 
 **Files modified:**
 - `frontend/src/components/CollectionView.tsx` — page-size selector, adaptive grid logic (`computeOptimalColumns`), localStorage persistence
@@ -64,7 +128,7 @@ _(empty)_
 
 **Depends on:** T12
 
-**Goal:** Allow users to select multiple records and delete them from both the local collection and Discogs, with a confirmation dialog.
+**Goal:** Allow users to select multiple records and delete them from both local collection and Discogs, with a confirmation dialog.
 
 **Files modified:**
 - `frontend/src/components/CollectionView.tsx` — selection state, toolbar, delete handler, confirmation modal
@@ -81,7 +145,7 @@ _(empty)_
 
 **Depends on:** T13
 
-**Goal:** Let users make their collection publicly viewable at `/collection/:username`. Add a privacy toggle in the profile page.
+**Goal:** Let users make their collection publicly viewable at `/collection/:username`. Add a privacy toggle in profile page.
 
 **Files modified:**
 - `frontend/src/components/CollectionView.tsx` — `readOnly` + `username` props, public endpoint loading
@@ -99,7 +163,7 @@ _(empty)_
 
 ### T8: Use Persistent HTTP Session for Discogs API
 
-**Goal:** Replace individual `requests.get()`/`requests.post()` calls to the Discogs API with a shared `requests.Session` to reuse TCP/TLS connections and avoid redundant header construction.
+**Goal:** Replace individual `requests.get()`/`requests.post()` calls to Discogs API with a shared `requests.Session` to reuse TCP/TLS connections and avoid redundant header construction.
 
 **Files modified:**
 - `backend/services/discogs.py` — module-level `_session` with HTTPAdapter retry; all calls use `_session.get/post`; `_headers()` now returns auth-only (User-Agent moved to session)
@@ -113,7 +177,7 @@ _(empty)_
 
 ### T7: Page-based Routing (Replace Tabs)
 
-**Goal:** Replace the tab-based navigation with proper client-side routes so each section has its own URL.
+**Goal:** Replace tab-based navigation with proper client-side routes so each section has its own URL.
 
 **Files modified:**
 - `frontend/package.json` — added `react-router-dom ^7.0.0`
@@ -122,16 +186,12 @@ _(empty)_
 
 ---
 
----
-
-## Finished
-
 ### T10: User Profile Page with Avatar
 
 **Goal:** Add a user profile page with account details, avatar upload, Discogs connection management, and sign-out.
 
 **Details:**
-- Profile tab in the top nav bar with user icon (alongside other pages)
+- Profile tab in top nav bar with user icon (alongside other pages)
 - Profile page shows: avatar (from OAuth or uploaded), display name, email, sign-out button
 - Avatar upload via Supabase Storage (`avatars` bucket), saved to user metadata
 - Placeholder user icon SVG for fallback (no initials)
@@ -175,7 +235,7 @@ _(empty)_
 - `backend/routes/usage.py` (create)
 - `backend/main.py` (register new router)
 
-## Finished
+---
 
 ### T1: Test Pipeline & CI/CD
 
@@ -200,32 +260,6 @@ _(empty)_
 
 ---
 
-### T6: LLM Cost Tracking & Provider Abstraction
-
-**Goal:** Implement LLM usage monitoring, cost tracking, and a provider-agnostic abstraction layer supporting OpenRouter and Google AI (Gemini), configurable via environment variable.
-
-**Details:**
-- Research OpenRouter token usage metrics from API response (`usage` field: prompt/completion/total tokens, cost) in `backend/services/vision.py`
-- Research Google AI (Gemini) direct API pricing vs OpenRouter; document cost comparison to determine if direct access is cheaper
-- Refactor `vision.py` and `config.py` into a provider abstraction layer: supports OpenRouter and Google AI, unified interface for chat completions with vision, configurable via `LLM_PROVIDER=openrouter|google` env var
-- Capture token usage after each LLM call (label reading and ranking) for both providers
-- Persist per-request records in a new MongoDB `llm_usage` collection: `timestamp`, `provider`, `model`, `operation`, `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`, `batch_id`/`item_id`, `cache_hit`
-- Cache hits must not generate cost entries
-- Add `GET /api/usage` endpoint returning aggregated stats (total cost, cost per day, cost per model, average tokens per request)
-- Fixed `batch_id`/`item_id` not being forwarded to `process_single_image` in batch routes
-
-**Files created/modified:**
-- `backend/config.py`
-- `backend/services/vision.py`
-- `backend/services/search.py`
-- `backend/repository/mongo.py`
-- `backend/repository/models.py`
-- `backend/routes/usage.py` (created)
-- `backend/routes/batch.py`
-- `backend/main.py`
-
----
-
 ### T3: Fuzzy Matching — OR Instead of AND
 
 **Goal:** Change fuzzy artist/album matching from AND to OR logic.
@@ -241,7 +275,7 @@ _(empty)_
 
 ### T4: Replace "Not present in label" with null
 
-**Goal:** Remove the sentinel string from LLM prompts. Use `null` for missing album/artist.
+**Goal:** Remove sentinel string from LLM prompts. Use `null` for missing album/artist.
 
 **Details:**
 - Updated both prompts in `backend/config.py`: albums/artists are now `array of strings or null` (null if not visible)

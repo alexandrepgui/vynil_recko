@@ -89,8 +89,12 @@ export interface SyncStatus {
   error?: string | null;
 }
 
+// Default user settings (sync with backend/config.py DEFAULT_USER_SETTINGS)
+export const DEFAULT_USER_SETTINGS = { collection_public: false, dark_mode: true } as const;
+
 export interface UserSettings {
   collection_public: boolean;
+  dark_mode?: boolean;
 }
 
 export interface PublicCollectionResponse {

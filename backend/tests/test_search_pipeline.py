@@ -6,7 +6,10 @@ import pytest
 
 from conftest import FAKE_RANKING, make_discogs_response, make_mock_llm_client
 from services.discogs_auth import OAuthTokens
-from services.search import _SPACER_GIF, _build_debug, process_single_image
+from config import DISCOGS_SPACER_GIF
+from services.search import _build_debug, process_single_image
+
+_SPACER_GIF = DISCOGS_SPACER_GIF  # For backward compatibility with existing test assertions
 
 _FAKE_TOKENS = OAuthTokens(access_token="t", access_token_secret="s", username="testuser")
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { discogsLogout, getProfile, getSettings, startDiscogsLogin, updateSettings } from '../api';
 import { useAuth } from '../AuthContext';
+import { useTheme } from '../ThemeContext';
 import { supabase } from '../supabaseClient';
 import type { UserProfile, UserSettings } from '../types';
 import { isValidDiscogsUrl } from '../utils';
@@ -39,6 +40,7 @@ function resizeImage(file: File): Promise<Blob> {
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
+  const { darkMode, setDarkMode, toggleDarkMode } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [discogsLoading, setDiscogsLoading] = useState(false);
@@ -59,13 +61,18 @@ export default function ProfilePage() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      setSettings(await getSettings());
+      const s = await getSettings();
+      setSettings(s);
+      // Sync dark mode preference from server (only if changed)
+      if (s.dark_mode !== undefined && s.dark_mode !== darkMode) {
+        setDarkMode(s.dark_mode);
+      }
     } catch {
       // Fall back to defaults but warn the user
       setSettings({ collection_public: false });
       setSettingsError(true);
     }
-  }, []);
+  }, [setDarkMode, darkMode]);
 
   useEffect(() => {
     fetchProfile();
@@ -174,6 +181,20 @@ export default function ProfilePage() {
     }
   };
 
+  const handleToggleDarkMode = async () => {
+    const newDarkMode = !darkMode;
+    toggleDarkMode();
+    setError(null);
+    try {
+      const updated = await updateSettings({ dark_mode: newDarkMode });
+      setSettings(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn\'t save that setting. Try again?');
+      // Revert on error
+      toggleDarkMode();
+    }
+  };
+
   const p = profile!;
   const avatarUrl = p.avatar_url;
 
@@ -265,6 +286,26 @@ export default function ProfilePage() {
         <span className="profile-visibility-status">
           {settings?.collection_public ? 'Public' : 'Private'}
         </span>
+      </div>
+
+      <div className="profile-section">
+        <h3 className="profile-section-title">Appearance</h3>
+        <div className="profile-visibility-row">
+          <div className="profile-visibility-info">
+            <span className="profile-visibility-label">Dark mode</span>
+            <span className="profile-visibility-hint">
+              Use a dark color scheme for the interface
+            </span>
+          </div>
+          <button
+            className={`toggle-switch${darkMode ? ' toggle-on' : ''}`}
+            onClick={handleToggleDarkMode}
+            disabled={settingsLoading}
+            aria-label="Toggle dark mode"
+          >
+            <span className="toggle-knob" />
+          </button>
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}

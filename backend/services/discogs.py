@@ -5,7 +5,15 @@ from difflib import SequenceMatcher
 
 import requests
 
-from config import DISCOGS_BASE_URL, DISCOGS_USER_AGENT
+from config import (
+    DISCOGS_BASE_URL,
+    DISCOGS_EARLY_EXIT_THRESHOLD,
+    DISCOGS_MAX_PAGES,
+    DISCOGS_PER_PAGE,
+    DISCOGS_SPACER_GIF,
+    DISCOGS_TRACK_QUERY_LIMIT,
+    DISCOGS_USER_AGENT,
+)
 from logger import get_logger
 from services.discogs_auth import OAuthTokens, build_oauth_headers
 from utils import create_retry_session
@@ -42,10 +50,10 @@ def _respect_rate_limit(resp: requests.Response) -> None:
             time.sleep(_RATE_LIMIT_PAUSE)
 
 
-def discogs_search(tokens: OAuthTokens, max_pages: int = 10, **params) -> list[dict]:
+def discogs_search(tokens: OAuthTokens, max_pages: int = DISCOGS_MAX_PAGES, **params) -> list[dict]:
     """Search Discogs with arbitrary params, paginating through all results."""
     params.setdefault("type", "release")
-    params.setdefault("per_page", 50)
+    params.setdefault("per_page", DISCOGS_PER_PAGE)
     all_results = []
     page = 1
     log.debug("discogs_search start: params=%s max_pages=%d", params, max_pages)
@@ -65,6 +73,10 @@ def discogs_search(tokens: OAuthTokens, max_pages: int = 10, **params) -> list[d
             log.debug("No results on page %d, stopping", page)
             break
         all_results.extend(results)
+        # Early exit if we have enough results for ranking
+        if len(all_results) >= DISCOGS_EARLY_EXIT_THRESHOLD:
+            log.debug("Early exit: %d results sufficient for ranking", len(all_results))
+            break
         log.debug("Page %d: %d results (total so far: %d)", page, len(results), len(all_results))
         if page >= data.get("pagination", {}).get("pages", 1):
             break
@@ -259,8 +271,8 @@ def generate_search_candidates(
 
     # 5. Track name search (last resort — no sanity check, relies on LLM ranking)
     if candidate_tracks:
-        # Pick up to 3 distinctive track names to form a query
-        query_tracks = candidate_tracks[:3]
+        # Pick up to N distinctive track names to form a query
+        query_tracks = candidate_tracks[:DISCOGS_TRACK_QUERY_LIMIT]
         query = " ".join(query_tracks)
         strategy = f"q='{query}' (track names)"
         log.info("Strategy 5: track name search q='%s'", query)

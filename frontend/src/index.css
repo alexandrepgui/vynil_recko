@@ -1,25 +1,49 @@
 /* ── Theme tokens ─────────────────────────────────────────────────────── */
 :root {
-  --bg:             #F4E3CD;
-  --bg-glass:       rgba(244, 227, 205, 0.85);
-  --surface:        #ECD5B8;
+  --bg:             #F4F5F7;
+  --bg-glass:       rgba(244, 245, 247, 0.85);
+  --surface:        #FFFFFF;
   --text-primary:   #1A1520;
   --text-secondary: #5C4F6A;
-  --border:         #D9C5A8;
+  --border:         #E2E4E8;
   --accent:         #2717B0;
   --accent-text:    #2717B0;
   --accent-hover:   #3829C8;
   --accent-subtle:  rgba(39, 23, 176, 0.08);
-  --on-accent:      #F4E3CD;
+  --on-accent:      #FFFFFF;
   --danger:         #EE2004;
   --danger-subtle:  rgba(238, 32, 4, 0.08);
   --on-danger:      #FFFFFF;
   --success:        #6B8F5E;
   --success-subtle: rgba(107, 143, 94, 0.10);
-  --shadow-card:    0 1px 3px rgba(26, 23, 20, 0.06);
-  --shadow-hover:   0 4px 16px rgba(26, 23, 20, 0.10);
-  --shadow-modal:   0 8px 32px rgba(26, 23, 20, 0.18);
+  --shadow-card:    0 1px 3px rgba(26, 23, 20, 0.04);
+  --shadow-hover:   0 4px 16px rgba(26, 23, 20, 0.08);
+  --shadow-modal:   0 8px 32px rgba(26, 23, 20, 0.15);
   --overlay:        rgba(26, 23, 20, 0.50);
+}
+
+/* ── Dark mode tokens ──────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:             #18181B;
+  --bg-glass:       rgba(24, 24, 27, 0.85);
+  --surface:        #27272A;
+  --text-primary:   #E4E4E7;
+  --text-secondary: #A1A1AA;
+  --border:         #3F3F46;
+  --accent:         #6366F1;
+  --accent-text:    #6366F1;
+  --accent-hover:   #818CF8;
+  --accent-subtle:  rgba(99, 102, 241, 0.15);
+  --on-accent:      #FFFFFF;
+  --danger:         #EF4444;
+  --danger-subtle:  rgba(239, 68, 68, 0.15);
+  --on-danger:      #FFFFFF;
+  --success:        #10B981;
+  --success-subtle: rgba(16, 185, 129, 0.15);
+  --shadow-card:    0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-hover:   0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-modal:   0 8px 32px rgba(0, 0, 0, 0.5);
+  --overlay:        rgba(0, 0, 0, 0.70);
 }
 
 /* ── Global reset ──────────────────────────────────────────────────────── */

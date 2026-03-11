@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from auth import User, get_current_user
+from config import DEFAULT_USER_SETTINGS
 from deps import get_repo
 from repository.mongo import MongoRepository
 from services.discogs_auth import is_configured
@@ -48,6 +49,7 @@ async def get_settings(
 
 class UpdateSettingsRequest(BaseModel):
     collection_public: bool | None = None
+    dark_mode: bool | None = None
 
 
 @router.put("/settings")
@@ -62,5 +64,4 @@ async def update_settings(
         return repo.get_user_settings(user.id)
     repo.update_user_settings(user.id, updates)
     # Merge updates into defaults to avoid an extra DB round-trip
-    defaults = {"collection_public": False}
-    return {**defaults, **updates}
+    return {**DEFAULT_USER_SETTINGS, **updates}

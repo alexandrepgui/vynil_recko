@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from config import DEV_MODE, LLM_PRICING
+from config import DEV_MODE, DISCOGS_SPACER_GIF, LLM_PRICING
 from deps import get_repo
 from models import DiscogsResult, LabelData, SearchResponse
 from repository import LLMUsageRecord
@@ -14,13 +14,11 @@ from logger import get_logger
 
 log = get_logger("services.search")
 
-_SPACER_GIF = "spacer.gif"
-
 
 def _has_cover_image(release: dict) -> bool:
     """Return True if the release has a real cover image (not a Discogs spacer placeholder)."""
     url = release.get("cover_image")
-    return bool(url) and _SPACER_GIF not in url
+    return bool(url) and DISCOGS_SPACER_GIF not in url
 
 
 def _calculate_cost(llm_response: LLMResponse) -> float:

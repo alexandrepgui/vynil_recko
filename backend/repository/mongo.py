@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReplaceOne
 from pymongo.collection import Collection
 
+from config import DEFAULT_USER_SETTINGS
 from logger import get_logger
 from .models import Batch, BatchItem, CollectionItem, CollectionRecord, LLMUsageRecord, SearchRecord
 
@@ -165,7 +166,7 @@ class MongoRepository:
 
     def get_user_settings(self, user_id: str) -> dict:
         doc = self._db["user_settings"].find_one({"_id": user_id}, {"_id": 0})
-        return doc or {"collection_public": False}
+        return doc or DEFAULT_USER_SETTINGS
 
     def update_user_settings(self, user_id: str, settings: dict) -> None:
         self._db["user_settings"].update_one(

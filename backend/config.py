@@ -28,7 +28,17 @@ UPLOADS_DIR = Path(__file__).resolve().parent / ".uploads"
 DISCOGS_BASE_URL = "https://api.discogs.com"
 DISCOGS_USER_AGENT = "VynilRecko/1.0"
 
+# Discogs API pagination settings — optimized for performance while preserving accuracy
+DISCOGS_MAX_PAGES = 2
+DISCOGS_PER_PAGE = 30
+DISCOGS_EARLY_EXIT_THRESHOLD = 30  # Stop fetching when we have enough for ranking (MAX_RANKING_RESULTS=20)
+DISCOGS_TRACK_QUERY_LIMIT = 3  # Number of track names to use in fallback search
+DISCOGS_SPACER_GIF = "spacer.gif"  # Placeholder image filename (no real cover)
+
 MAX_RANKING_RESULTS = 20
+
+# Default user settings (also used in frontend types.ts for sync)
+DEFAULT_USER_SETTINGS = {"collection_public": False, "dark_mode": True}
 
 DEV_MODE = os.getenv("DEV_MODE", "").lower() in ("1", "true", "yes")
 

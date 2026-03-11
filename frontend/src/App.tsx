@@ -4,6 +4,7 @@ import './App.css';
 import { getAllReviewItems, getCollectionSyncStatus, searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
+import { ThemeProvider } from './ThemeContext';
 import { ToastProvider } from './components/Toast';
 import ImageUpload from './components/ImageUpload';
 import LoginPage from './components/LoginPage';
@@ -83,7 +84,7 @@ function SingleSearchPage() {
     <>
       <div className="media-selected-bar">
         <div className="media-selected-info">
-          <img src={mediaType === 'cd' ? cdIcon : vinylIcon} alt="" className="media-selected-icon" />
+          <img src={mediaType === 'cd' ? cdIcon : vinylIcon} alt="" className="media-selected-icon dark-mode-invert" />
           <span>{mediaType === 'cd' ? 'CD' : 'Vinyl'}</span>
         </div>
         <button className="btn-change-media" onClick={handleChangeType}>Change</button>
@@ -228,6 +229,8 @@ function AppInner() {
     return <LoginPage />;
   }
 
+  const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
+
   return (
     <div className="app">
       <nav className="app-navbar">
@@ -248,12 +251,16 @@ function AppInner() {
 
         <div className="navbar-actions">
           <NavLink to="/profile" className="nav-avatar-btn" title="Profile">
-            <span className="nav-avatar-fallback">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-            </span>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="nav-avatar-img" />
+            ) : (
+              <span className="nav-avatar-fallback">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </span>
+            )}
           </NavLink>
         </div>
       </nav>
@@ -279,14 +286,16 @@ function AppInner() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <Routes>
-            <Route path="/collection/:username" element={<PublicCollectionPage />} />
-            <Route path="/*" element={<AppInner />} />
-          </Routes>
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <Routes>
+              <Route path="/collection/:username" element={<PublicCollectionPage />} />
+              <Route path="/*" element={<AppInner />} />
+            </Routes>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
