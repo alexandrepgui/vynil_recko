@@ -124,7 +124,7 @@ export default function ResultCard({ result, itemId, renderActions, className }:
                     onClick={handleAddToCollection}
                   >
                     {status === 'loading' ? 'Adding...' :
-                     status === 'error' ? 'Failed — Retry?' :
+                     status === 'error' ? 'Didn\'t work — try again?' :
                      'Add to collection'}
                   </button>
                 )}

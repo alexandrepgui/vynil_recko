@@ -27,12 +27,12 @@ function resizeImage(file: File): Promise<Blob> {
       ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
 
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Failed to compress image'))),
+        (blob) => (blob ? resolve(blob) : reject(new Error('Couldn\'t process that image. Try a different one?'))),
         'image/jpeg',
         AVATAR_QUALITY,
       );
     };
-    img.onerror = () => { cleanup(); reject(new Error('Failed to load image')); };
+    img.onerror = () => { cleanup(); reject(new Error('Couldn\'t read that image. Try a different one?')); };
     img.src = objectUrl;
   });
 }
@@ -51,7 +51,7 @@ export default function ProfilePage() {
     try {
       setProfile(await getProfile());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load profile');
+      setError(e instanceof Error ? e.message : 'Couldn\'t load your profile. Try refreshing?');
     }
   }, []);
 
@@ -119,7 +119,7 @@ export default function ProfilePage() {
 
       setProfile((p) => p ? { ...p, avatar_url: avatarUrl } : p);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to upload avatar');
+      setError(e instanceof Error ? e.message : 'Couldn\'t upload your photo. Try again?');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -134,7 +134,7 @@ export default function ProfilePage() {
         p ? { ...p, discogs: { ...p.discogs, connected: false, username: null } } : p,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to disconnect');
+      setError(e instanceof Error ? e.message : 'Couldn\'t disconnect from Discogs. Try again?');
     } finally {
       setDiscogsLoading(false);
     }
@@ -152,7 +152,7 @@ export default function ProfilePage() {
       }
       window.location.href = authorizeUrl;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start Discogs login');
+      setError(e instanceof Error ? e.message : 'Couldn\'t connect to Discogs. Try again in a moment?');
       setDiscogsLoading(false);
     }
   };
@@ -165,7 +165,7 @@ export default function ProfilePage() {
       const updated = await updateSettings({ collection_public: !settings.collection_public });
       setSettings(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update settings');
+      setError(e instanceof Error ? e.message : 'Couldn\'t save that setting. Try again?');
     } finally {
       setSettingsLoading(false);
     }

@@ -31,7 +31,7 @@ export default function LoginPage() {
         setSignupSuccess(true);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : 'Couldn\'t sign you in. Check your credentials and try again.');
     } finally {
       setLoading(false);
     }

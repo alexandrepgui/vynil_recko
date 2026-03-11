@@ -13,7 +13,7 @@ export default function ResultsList({ results, itemId }: Props) {
   const [showCount, setShowCount] = useState(PAGE_SIZE);
 
   if (results.length === 0) {
-    return <p className="no-results">No releases found.</p>;
+    return <p className="no-results">No matching releases found. Try a clearer photo?</p>;
   }
 
   const visible = results.slice(0, showCount);
