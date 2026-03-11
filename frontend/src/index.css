@@ -6,13 +6,13 @@
   --text-primary:   #1A1520;
   --text-secondary: #5C4F6A;
   --border:         #D9C5A8;
-  --accent:         #2B1BDF;
+  --accent:         #2717B0;
   --accent-text:    #2717B0;
-  --accent-hover:   #3D2EF0;
-  --accent-subtle:  rgba(43, 27, 223, 0.08);
+  --accent-hover:   #3829C8;
+  --accent-subtle:  rgba(39, 23, 176, 0.08);
   --on-accent:      #F4E3CD;
-  --danger:         #F31C05;
-  --danger-subtle:  rgba(243, 28, 5, 0.08);
+  --danger:         #EE2004;
+  --danger-subtle:  rgba(238, 32, 4, 0.08);
   --on-danger:      #FFFFFF;
   --success:        #6B8F5E;
   --success-subtle: rgba(107, 143, 94, 0.10);

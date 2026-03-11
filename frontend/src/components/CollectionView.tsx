@@ -18,27 +18,6 @@ function loadPageSize(): number {
   return 50;
 }
 
-/**
- * Given `itemCount` items and a maximum number of columns that fit,
- * return the column count (>= 1) that minimises empty cells in the last row.
- * Prefer fewer empty cells; on ties, prefer more columns.
- */
-function computeOptimalColumns(itemCount: number, maxCols: number): number {
-  if (itemCount <= 0 || maxCols <= 0) return maxCols || 1;
-  let best = maxCols;
-  let bestEmpty = maxCols; // worst case
-  for (let cols = maxCols; cols >= 1; cols--) {
-    const remainder = itemCount % cols;
-    const empty = remainder === 0 ? 0 : cols - remainder;
-    if (empty < bestEmpty) {
-      bestEmpty = empty;
-      best = cols;
-    }
-    if (bestEmpty === 0) break;
-  }
-  return best;
-}
-
 const SORT_OPTIONS = [
   { value: 'artist', label: 'Artist' },
   { value: 'title', label: 'Title' },
@@ -63,7 +42,6 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(loadPageSize);
-  const [gridColumns, setGridColumns] = useState<number | null>(null);
 
   // Public collection owner info
   const [ownerName, setOwnerName] = useState<string | null>(null);
@@ -84,8 +62,6 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const gridRef = useRef<HTMLDivElement>(null);
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Debounced search value actually sent to the API
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -145,41 +121,6 @@ export default function CollectionView({ readOnly = false, username }: Collectio
     fetchCollection(page, pageSize, sort, sortOrder, debouncedSearch);
   }, [hasSynced, isSyncing, page, pageSize, sort, sortOrder, debouncedSearch, fetchCollection]);
 
-  // Adaptive grid: compute optimal columns based on container width and item count
-  const itemCountRef = useRef(items.length);
-  itemCountRef.current = items.length;
-
-  const recalcColumns = useCallback(() => {
-    const container = gridRef.current;
-    if (!container || itemCountRef.current === 0) {
-      setGridColumns(null);
-      return;
-    }
-    const containerWidth = container.clientWidth;
-    const gap = 20; // 1.25rem gap
-    const preferredCardWidth = 220; // px
-    const maxCols = Math.max(1, Math.floor((containerWidth + gap) / (preferredCardWidth + gap)));
-    const optimal = computeOptimalColumns(itemCountRef.current, maxCols);
-    setGridColumns(optimal);
-  }, []);
-
-  useEffect(() => {
-    recalcColumns();
-    const handleResize = () => {
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-      resizeTimerRef.current = setTimeout(recalcColumns, 150);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-    };
-  }, [recalcColumns]);
-
-  // Recalculate columns when item count changes
-  useEffect(() => {
-    recalcColumns();
-  }, [items.length, recalcColumns]);
 
   // Debounce search input
   useEffect(() => {
@@ -354,7 +295,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   return (
     <div className="collection-view">
       {readOnly && ownerName && (
-        <h2 className="public-collection-owner">{ownerName}'s Collection</h2>
+        <h2 className="public-collection-owner"><span className="public-collection-username">{ownerName}</span>'s collection</h2>
       )}
 
       <div className="collection-controls">
@@ -437,7 +378,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       )}
 
       {loading && (
-        <div className="collection-grid" aria-hidden="true" ref={gridRef}>
+        <div className="collection-grid" aria-hidden="true">
           {Array.from({ length: Math.min(pageSize, 25) }, (_, i) => (
             <div key={i} className="collection-card skeleton-card">
               <div className="skeleton-cover skeleton-shimmer" />
@@ -462,11 +403,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
           <div className="collection-info">
             {totalItems} item{totalItems !== 1 ? 's' : ''} in collection
           </div>
-          <div
-            className="collection-grid"
-            ref={gridRef}
-            style={gridColumns ? { gridTemplateColumns: `repeat(${gridColumns}, 1fr)` } : undefined}
-          >
+          <div className="collection-grid">
             {items.map((item) => (
               <div
                 key={`${item.release_id}-${item.instance_id}`}

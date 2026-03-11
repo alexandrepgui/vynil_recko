@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import logoIcon from '../assets/icon.svg';
-import logoImg from '../assets/logo.svg';
 import { HideIcon, ViewIcon } from './Icons';
 import { supabase } from '../supabaseClient';
 
@@ -48,7 +47,7 @@ export default function LoginPage() {
         <div className="login-card">
           <div className="login-logo">
             <img src={logoIcon} alt="" className="login-icon" />
-            <img src={logoImg} alt="groove log" className="login-wordmark" />
+            <span className="login-title">groove log</span>
           </div>
           <p className="login-success">Check your email to confirm your account, then log in.</p>
           <button className="btn btn-primary" onClick={() => { setSignupSuccess(false); setMode('login'); }}>
@@ -64,7 +63,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-logo">
           <img src={logoIcon} alt="" className="login-icon" />
-          <img src={logoImg} alt="groove log" className="login-wordmark" />
+          <span className="login-title">groove log</span>
         </div>
         <p className="login-subtitle">Your records, identified.</p>
 

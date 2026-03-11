@@ -16,7 +16,7 @@
 }
 
 h2, h3 {
-  font-family: 'Coustard', Georgia, serif;
+  font-weight: 500;
 }
 
 /* ── Sticky navigation bar ─────────────────────────────────────────────── */
@@ -211,7 +211,7 @@ h2, h3 {
 }
 
 .app-header p {
-  font-family: 'Coustard', Georgia, serif;
+  font-family: inherit;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -415,7 +415,7 @@ h2, h3 {
 .result-title {
   margin: 0 0 0.15rem;
   font-size: 1.05rem;
-  font-family: 'Coustard', Georgia, serif;
+  font-family: inherit;
 }
 
 .result-artist {
@@ -671,6 +671,7 @@ h2, h3 {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  font-weight: 500;
 }
 
 .batch-review-counter {
@@ -679,42 +680,22 @@ h2, h3 {
   color: var(--text-secondary);
 }
 
-.batch-review-label-info {
+.batch-review-main {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   gap: 0.75rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.batch-review-label-info > div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.batch-review-photo-wrapper {
-  display: flex;
-  justify-content: center;
 }
 
 .batch-review-photo {
-  max-width: 100%;
-  width: 400px;
-  height: auto;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  flex-shrink: 0;
+  width: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  opacity: 0.85;
+  transition: opacity 0.2s;
 }
 
-.batch-review-filename {
-  font-weight: 400;
-  color: var(--text-primary);
-}
-
-.batch-review-extracted {
-  font-style: italic;
+.batch-review-photo:hover {
+  opacity: 1;
 }
 
 .batch-review-featured .result-cover {
@@ -1023,7 +1004,7 @@ h2, h3 {
 .issues-section-title {
   margin: 0 0 0.75rem;
   font-size: 1.05rem;
-  font-family: 'Coustard', Georgia, serif;
+  font-family: inherit;
   color: var(--text-primary);
 }
 
@@ -1493,7 +1474,7 @@ h2, h3 {
 .login-subtitle {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  font-family: 'Coustard', Georgia, serif;
+  font-family: inherit;
   margin: 0 0 1.5rem;
 }
 
@@ -1724,7 +1705,7 @@ h2, h3 {
 .profile-section-title {
   margin: 0 0 0.75rem;
   font-size: 1rem;
-  font-family: 'Coustard', Georgia, serif;
+  font-family: inherit;
   color: var(--text-primary);
 }
 
@@ -1855,14 +1836,20 @@ h2, h3 {
 
 .public-collection-owner {
   margin: 0;
-  padding: 0.5rem 0 0.25rem;
+  padding: 0 0 0.25rem;
   text-align: center;
   font-size: 1.3rem;
+  font-family: 'Shrikhand', cursive;
   color: var(--text-primary);
 }
 
+.public-collection-username {
+  color: var(--accent-text);
+}
+
 .public-collection-page .app-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  padding-top: 1.5rem;
 }
 
 /* ── Copy link button ──────────────────────────────────────────────────── */

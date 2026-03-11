@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { addToCollection, reviewItemGlobal, undoReviewItem } from '../api';
 import type { BatchItem, DebugInfo } from '../types';
 import ResultCard from './ResultCard';
-import ZoomableImage from './ZoomableImage';
 
 interface Props {
   items: BatchItem[];
@@ -64,6 +63,10 @@ export default function BatchReview({ items, onDone }: Props) {
   const [actionLoading, setActionLoading] = useState(false);
   // Track items acted on in this session: item_id -> action
   const [acted, setActed] = useState<Map<string, 'accepted' | 'skipped' | 'wrong'>>(new Map());
+  const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
+  const cardRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) setCardHeight(node.offsetHeight);
+  }, []);
 
   const completedItems = items.filter((i) => i.status === 'completed' && i.review_status === 'unreviewed');
   const reviewable = completedItems.filter((i) => !acted.has(i.item_id));
@@ -197,23 +200,35 @@ export default function BatchReview({ items, onDone }: Props) {
         )}
       </div>
 
-      {topResult ? (
-        <ResultCard
-          result={topResult}
-          className="batch-review-featured"
-          renderActions={(r) => (
-            <>
-              {r.discogs_url && (
-                <a href={r.discogs_url} target="_blank" rel="noopener noreferrer" className="btn btn-discogs">
-                  See in Discogs
-                </a>
+      <div className="batch-review-main">
+        {topResult ? (
+          <div ref={cardRef} style={{ flex: 1, minWidth: 0 }}>
+            <ResultCard
+              result={topResult}
+              className="batch-review-featured"
+              renderActions={(r) => (
+                <>
+                  {r.discogs_url && (
+                    <a href={r.discogs_url} target="_blank" rel="noopener noreferrer" className="btn btn-discogs">
+                      See in Discogs
+                    </a>
+                  )}
+                </>
               )}
-            </>
-          )}
-        />
-      ) : (
-        <p className="batch-review-no-results">No results found for this image.</p>
-      )}
+            />
+          </div>
+        ) : (
+          <p className="batch-review-no-results">No results found for this image.</p>
+        )}
+        {item.image_url && cardHeight && (
+          <img
+            src={item.image_url}
+            alt={item.image_filename}
+            className="batch-review-photo"
+            style={{ height: cardHeight }}
+          />
+        )}
+      </div>
 
       <div className="batch-review-actions">
         <div className="batch-review-actions-row">
@@ -315,24 +330,7 @@ export default function BatchReview({ items, onDone }: Props) {
 
       {item.debug && <DebugPanel debug={item.debug} />}
 
-      {item.image_url && (
-        <div className="batch-review-photo-wrapper">
-          <ZoomableImage
-            src={item.image_url}
-            alt={item.image_filename}
-            className="batch-review-photo"
-          />
-        </div>
-      )}
 
-      <div className="batch-review-label-info">
-        <span className="batch-review-filename">{item.image_filename}</span>
-        {item.label_data && (
-          <span className="batch-review-extracted">
-            {item.label_data.artists.join(', ')} — {item.label_data.albums.join(', ')}
-          </span>
-        )}
-      </div>
 
       {reviewable.length === 0 && acted.size > 0 && (
         <div className="batch-review-done-hint">

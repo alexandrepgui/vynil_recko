@@ -17,7 +17,6 @@ import ProfilePage from './components/ProfilePage';
 import vinylIcon from './assets/vinyl.svg';
 import cdIcon from './assets/cd.svg';
 import { SingleSearchIcon, BatchIcon, ReviewIcon, IssuesIcon } from './components/Icons';
-import logoImg from './assets/logo.svg';
 import logoIcon from './assets/icon.svg';
 
 function SingleSearchPage() {
@@ -187,10 +186,7 @@ function PublicCollectionPage() {
   return (
     <div className="app public-collection-page">
       <header className="app-header">
-        <div className="app-logo-row">
-          <img src={logoIcon} alt="" className="app-icon" />
-          <img src={logoImg} alt="groove log" className="app-logo" />
-        </div>
+        <img src={logoIcon} alt="groove log" className="app-icon" />
       </header>
       <CollectionView readOnly username={username} />
     </div>
@@ -236,8 +232,7 @@ function AppInner() {
     <div className="app">
       <nav className="app-navbar">
         <NavLink to="/" className="navbar-logo">
-          <img src={logoIcon} alt="" className="navbar-icon" />
-          <img src={logoImg} alt="groove log" className="navbar-wordmark" />
+          <img src={logoIcon} alt="groove log" className="navbar-icon" />
         </NavLink>
 
         <div className="navbar-links">
