@@ -1211,19 +1211,18 @@ h2, h3 {
   gap: 1.25rem;
 }
 
-/* Cards — borderless, surface-on-bg contrast */
+/* Cards — chromeless, art-forward */
 .collection-card {
   position: relative;
-  border-radius: 6px;
-  background: var(--surface);
+  border-radius: 0;
+  background: none;
   overflow: hidden;
-  box-shadow: var(--shadow-card);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: none;
+  transition: transform 0.2s;
 }
 
 .collection-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
 }
 
 /* Square album art — no rounded corners */
@@ -1265,13 +1264,30 @@ h2, h3 {
 }
 
 .collection-card-info {
-  padding: 0.5rem 0.65rem 0.6rem;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1.5rem 0.65rem 0.6rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.collection-card:hover .collection-card-info {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .collection-card-info {
+    opacity: 1;
+  }
 }
 
 .collection-card-title {
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #FFFFFF;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1279,7 +1295,7 @@ h2, h3 {
 
 .collection-card-artist {
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1289,18 +1305,25 @@ h2, h3 {
 .collection-card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 0;
 }
 
 .collection-card-meta span {
-  background: var(--bg);
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  font-size: 0.68rem;
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.72rem;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.collection-card-meta span + span::before {
+  content: '\00b7';
+  margin: 0 0.3rem;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── Collection pagination ─────────────────────────────────────────────── */
@@ -2070,6 +2093,8 @@ h2, h3 {
 
 .skeleton-card {
   pointer-events: none;
+  background: none;
+  box-shadow: none;
 }
 
 .skeleton-cover {
@@ -2080,10 +2105,7 @@ h2, h3 {
 }
 
 .skeleton-info {
-  padding: 0.5rem 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  display: none;
 }
 
 .skeleton-bar {
