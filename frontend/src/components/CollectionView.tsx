@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, triggerCollectionSync } from '../api';
 import type { CollectionItem, SyncStatus } from '../types';
 import { useToast } from './Toast';
-import ZoomableImage from './ZoomableImage';
+import { createPortal } from 'react-dom';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 150, 200, 250];
 const PAGE_SIZE_KEY = 'groove-log-page-size';
@@ -386,6 +386,16 @@ export default function CollectionView({ readOnly = false, username }: Collectio
     }
   };
 
+  // Close context menu on Escape
+  useEffect(() => {
+    if (!showContextMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowContextMenu(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showContextMenu]);
+
   // Context menu handlers
   const handleCardClick = (item: CollectionItem) => {
     setContextItem(item);
@@ -629,13 +639,13 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {!loading && !error && items.length === 0 && allItems.length === 0 && (
         <p className="no-results">
           {search ? 'No items match your search.' : 'No records yet. Sync from Discogs to get started.'}
         </p>
       )}
 
-      {!loading && items.length > 0 && (
+      {!loading && (items.length > 0 || allItems.length > 0) && (
         <>
           <div className="collection-info">
             {totalItems} item{totalItems !== 1 ? 's' : ''} in collection
@@ -669,8 +679,8 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                           </label>
                         )}
                         {item.cover_image ? (
-                          <div className="collection-cover-wrapper" onClickCapture={(e) => e.stopPropagation()}>
-                            <ZoomableImage
+                          <div className="collection-cover-wrapper">
+                            <img
                               src={item.cover_image}
                               alt={item.title}
                               className="collection-cover"
@@ -678,7 +688,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                             />
                           </div>
                         ) : (
-                          <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available" onClickCapture={(e) => e.stopPropagation()}>
+                          <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
                             <div className="collection-cover-placeholder-icon" aria-hidden="true" />
                           </div>
                         )}
@@ -718,8 +728,8 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                     </label>
                   )}
                   {item.cover_image ? (
-                    <div className="collection-cover-wrapper" onClickCapture={(e) => e.stopPropagation()}>
-                      <ZoomableImage
+                    <div className="collection-cover-wrapper">
+                      <img
                         src={item.cover_image}
                         alt={item.title}
                         className="collection-cover"
@@ -727,7 +737,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                       />
                     </div>
                   ) : (
-                    <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available" onClickCapture={(e) => e.stopPropagation()}>
+                    <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
                       <div className="collection-cover-placeholder-icon" aria-hidden="true" />
                     </div>
                   )}
@@ -799,37 +809,50 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         </div>
       )}
 
-      {/* Context menu for individual record card */}
-      {showContextMenu && contextItem && (
+      {/* Record detail dialog — zoomed cover + actions */}
+      {showContextMenu && contextItem && createPortal(
         <div className="context-menu-overlay" onClick={() => setShowContextMenu(false)}>
-          <div className="context-menu" onClick={(e) => e.stopPropagation()}>
-            <h3 className="context-menu-title">{contextItem.title}</h3>
-            <p className="context-menu-subtitle">{contextItem.artist}</p>
-            <div className="context-menu-actions">
-              <button className="context-menu-item" onClick={handleViewOnDiscogs}>
-                View on Discogs
-              </button>
-              <button className="context-menu-item" onClick={handleViewPricing}>
-                View Pricing
-              </button>
-              {!readOnly && (
-                <>
-                  <div className="context-menu-divider" />
+          <div className="context-menu context-menu-with-cover" onClick={(e) => e.stopPropagation()}>
+            {contextItem.cover_image && (
+              <img
+                src={contextItem.cover_image}
+                alt={contextItem.title}
+                className="context-menu-cover"
+              />
+            )}
+            <div className="context-menu-body">
+              <h3 className="context-menu-title">{contextItem.title}</h3>
+              <p className="context-menu-subtitle">{contextItem.artist}</p>
+              <div className="context-menu-meta">
+                {contextItem.year > 0 && <span>{contextItem.year}</span>}
+                {contextItem.format && <span>{contextItem.format}</span>}
+                {contextItem.genres.slice(0, 2).map((g) => (
+                  <span key={g}>{g}</span>
+                ))}
+                {contextItem.styles.slice(0, 2).map((s) => (
+                  <span key={s}>{s}</span>
+                ))}
+              </div>
+              <div className="context-menu-actions">
+                <button className="context-menu-item" onClick={handleViewOnDiscogs}>
+                  View on Discogs
+                </button>
+                <button className="context-menu-item" onClick={handleViewPricing}>
+                  View Pricing
+                </button>
+                {!readOnly && (
                   <button
                     className="context-menu-item context-menu-item-danger"
                     onClick={handleDeleteFromCollection}
                   >
                     Delete from Collection
                   </button>
-                </>
-              )}
-              <div className="context-menu-divider" />
-              <button className="context-menu-item" onClick={() => setShowContextMenu(false)}>
-                Cancel
-              </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Delete confirmation for single item */}

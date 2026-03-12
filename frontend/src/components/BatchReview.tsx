@@ -1,14 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { addToCollection, reviewItemGlobal, undoReviewItem } from '../api';
-import type { BatchItem, DebugInfo } from '../types';
+import type { BatchItem, DebugInfo, LabelData } from '../types';
 import ResultCard from './ResultCard';
+import ZoomableImage from './ZoomableImage';
 
 interface Props {
   items: BatchItem[];
   onDone: () => void;
 }
 
-function DebugPanel({ debug }: { debug: DebugInfo }) {
+function DebugPanel({ debug, strategy, labelData }: { debug: DebugInfo; strategy?: string | null; labelData?: LabelData | null }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -23,12 +24,31 @@ function DebugPanel({ debug }: { debug: DebugInfo }) {
       </button>
       {open && (
         <div className="debug-content">
+          {strategy && (
+            <div className="debug-row">
+              <strong>Winning strategy:</strong> {strategy}
+            </div>
+          )}
           <div className="debug-row">
             <strong>Timing:</strong>{' '}
             vision {debug.timing_ms.vision}ms
             {debug.timing_ms.search != null && <> | search {debug.timing_ms.search}ms</>}
             {debug.timing_ms.ranking != null && <> | ranking {debug.timing_ms.ranking}ms</>}
           </div>
+          {labelData && (
+            <div className="debug-row">
+              <strong>LLM extraction:</strong>{' '}
+              {[
+                labelData.artists?.length && `artists: ${labelData.artists.join(', ')}`,
+                labelData.albums?.length && `albums: ${labelData.albums.join(', ')}`,
+                labelData.tracks?.length && `${labelData.tracks.length} track(s)`,
+                labelData.catno && `catno: ${labelData.catno}`,
+                labelData.label && `label: ${labelData.label}`,
+                labelData.year && `year: ${labelData.year}`,
+                labelData.country && `country: ${labelData.country}`,
+              ].filter(Boolean).join(' · ') || 'no data'}
+            </div>
+          )}
           {debug.prefilter && (
             <div className="debug-row">
               <strong>Prefilter:</strong> {debug.prefilter.before} → {debug.prefilter.after} releases
@@ -64,8 +84,14 @@ export default function BatchReview({ items, onDone }: Props) {
   // Track items acted on in this session: item_id -> action
   const [acted, setActed] = useState<Map<string, 'accepted' | 'skipped' | 'wrong'>>(new Map());
   const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
+  const observerRef = useRef<ResizeObserver | null>(null);
   const cardRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) setCardHeight(node.offsetHeight);
+    if (observerRef.current) observerRef.current.disconnect();
+    if (node) {
+      setCardHeight(node.offsetHeight);
+      observerRef.current = new ResizeObserver(() => setCardHeight(node.offsetHeight));
+      observerRef.current.observe(node);
+    }
   }, []);
 
   const completedItems = items.filter((i) => i.status === 'completed' && i.review_status === 'unreviewed');
@@ -221,7 +247,7 @@ export default function BatchReview({ items, onDone }: Props) {
           <p className="batch-review-no-results">No results found for this image.</p>
         )}
         {item.image_url && cardHeight && (
-          <img
+          <ZoomableImage
             src={item.image_url}
             alt={item.image_filename}
             className="batch-review-photo"
@@ -328,7 +354,7 @@ export default function BatchReview({ items, onDone }: Props) {
         </div>
       )}
 
-      {item.debug && <DebugPanel debug={item.debug} />}
+      {item.debug && <DebugPanel debug={item.debug} strategy={item.strategy} labelData={item.label_data} />}
 
 
 

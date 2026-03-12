@@ -1,34 +1,10 @@
-/* ── Theme tokens ─────────────────────────────────────────────────────── */
+/* ── Theme tokens — dark only ─────────────────────────────────────────── */
 :root {
-  --bg:             #F4F5F7;
-  --bg-glass:       rgba(244, 245, 247, 0.85);
-  --surface:        #FFFFFF;
-  --text-primary:   #1A1520;
-  --text-secondary: #5C4F6A;
-  --border:         #E2E4E8;
-  --accent:         #2717B0;
-  --accent-text:    #2717B0;
-  --accent-hover:   #3829C8;
-  --accent-subtle:  rgba(39, 23, 176, 0.08);
-  --on-accent:      #FFFFFF;
-  --danger:         #EE2004;
-  --danger-subtle:  rgba(238, 32, 4, 0.08);
-  --on-danger:      #FFFFFF;
-  --success:        #6B8F5E;
-  --success-subtle: rgba(107, 143, 94, 0.10);
-  --shadow-card:    0 1px 3px rgba(26, 23, 20, 0.04);
-  --shadow-hover:   0 4px 16px rgba(26, 23, 20, 0.08);
-  --shadow-modal:   0 8px 32px rgba(26, 23, 20, 0.15);
-  --overlay:        rgba(26, 23, 20, 0.50);
-}
-
-/* ── Dark mode tokens — warm charcoal-brown ──────────────────────────── */
-[data-theme="dark"] {
   --bg:             #1A1816;
   --bg-glass:       rgba(26, 24, 22, 0.85);
   --surface:        #262320;
-  --text-primary:   #E8E4DF;
-  --text-secondary: #A69E94;
+  --text-primary:   #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
   --border:         #3D3831;
   --accent:         #6366F1;
   --accent-text:    #6366F1;
