@@ -22,14 +22,14 @@
   --overlay:        rgba(26, 23, 20, 0.50);
 }
 
-/* ── Dark mode tokens ──────────────────────────────────────────────────── */
+/* ── Dark mode tokens — warm charcoal-brown ──────────────────────────── */
 [data-theme="dark"] {
-  --bg:             #18181B;
-  --bg-glass:       rgba(24, 24, 27, 0.85);
-  --surface:        #27272A;
-  --text-primary:   #E4E4E7;
-  --text-secondary: #A1A1AA;
-  --border:         #3F3F46;
+  --bg:             #1A1816;
+  --bg-glass:       rgba(26, 24, 22, 0.85);
+  --surface:        #262320;
+  --text-primary:   #E8E4DF;
+  --text-secondary: #A69E94;
+  --border:         #3D3831;
   --accent:         #6366F1;
   --accent-text:    #6366F1;
   --accent-hover:   #818CF8;
@@ -40,10 +40,10 @@
   --on-danger:      #FFFFFF;
   --success:        #10B981;
   --success-subtle: rgba(16, 185, 129, 0.15);
-  --shadow-card:    0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-hover:   0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-modal:   0 8px 32px rgba(0, 0, 0, 0.5);
-  --overlay:        rgba(0, 0, 0, 0.70);
+  --shadow-card:    0 1px 3px rgba(20, 15, 10, 0.3);
+  --shadow-hover:   0 4px 16px rgba(20, 15, 10, 0.4);
+  --shadow-modal:   0 8px 32px rgba(20, 15, 10, 0.5);
+  --overlay:        rgba(10, 8, 6, 0.70);
 }
 
 /* ── Global reset ──────────────────────────────────────────────────────── */
