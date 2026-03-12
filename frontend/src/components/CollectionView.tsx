@@ -504,78 +504,92 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       )}
 
       <div className="collection-controls">
-        <input
-          type="text"
-          className="collection-search"
-          placeholder="Search by title or artist..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="collection-sort">
+        <div className="collection-search-row">
+          <input
+            type="text"
+            className="collection-search"
+            placeholder="Search by title or artist..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="collection-filters-row">
+          <span className="filter-label">Sort:</span>
+          <div className="collection-sort">
+            <select
+              value={sort}
+              onChange={(e) => handleSortChange(e.target.value)}
+              className="collection-sort-select"
+              disabled={group !== 'none'}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn collection-sort-order"
+              onClick={toggleSortOrder}
+              disabled={group !== 'none'}
+              title={group !== 'none' ? 'Sorting disabled when grouped' : 'Toggle sort order'}
+            >
+              {sortOrder === 'asc' ? '\u2191' : '\u2193'}
+            </button>
+          </div>
+          <span className="filter-separator">&middot;</span>
+          <span className="filter-label">Group:</span>
           <select
-            value={sort}
-            onChange={(e) => handleSortChange(e.target.value)}
-            className="collection-sort-select"
-            disabled={group !== 'none'}
+            className="collection-group-select"
+            value={group}
+            onChange={(e) => handleGroupChange(e.target.value)}
+            title="Group records by"
           >
-            {SORT_OPTIONS.map((opt) => (
+            {GROUP_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <button
-            className="btn collection-sort-order"
-            onClick={toggleSortOrder}
-            disabled={group !== 'none'}
-            title={group !== 'none' ? 'Sorting disabled when grouped' : 'Toggle sort order'}
+          <span className="filter-separator">&middot;</span>
+          <select
+            className="collection-page-size-select"
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            title="Items per page"
           >
-            {sortOrder === 'asc' ? '\u2191' : '\u2193'}
-          </button>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n} / page
+              </option>
+            ))}
+          </select>
+          {!readOnly && (
+            <>
+              <span className="filter-separator">&middot;</span>
+              <button
+                className="btn collection-resync"
+                onClick={handleSync}
+                disabled={isSyncing}
+                title="Re-sync from Discogs"
+              >
+                Re-sync
+              </button>
+            </>
+          )}
+          {!readOnly && collectionPublic && discogsUsername && (
+            <>
+              <span className="filter-separator">&middot;</span>
+              <button
+                className="btn btn-copy-link"
+                onClick={handleCopyLink}
+                title="Copy public collection link"
+              >
+                Copy link
+              </button>
+            </>
+          )}
         </div>
-        <select
-          className="collection-group-select"
-          value={group}
-          onChange={(e) => handleGroupChange(e.target.value)}
-          title="Group records by"
-        >
-          {GROUP_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <select
-          className="collection-page-size-select"
-          value={pageSize}
-          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-          title="Items per page"
-        >
-          {PAGE_SIZE_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n} / page
-            </option>
-          ))}
-        </select>
-        {!readOnly && (
-          <button
-            className="btn collection-resync"
-            onClick={handleSync}
-            disabled={isSyncing}
-            title="Re-sync from Discogs"
-          >
-            Re-sync
-          </button>
-        )}
-        {!readOnly && collectionPublic && discogsUsername && (
-          <button
-            className="btn btn-copy-link"
-            onClick={handleCopyLink}
-            title="Copy public collection link"
-          >
-            Copy link
-          </button>
-        )}
       </div>
 
       {error && <p className="error">{error}</p>}
