@@ -151,9 +151,27 @@ class MongoRepository:
 
     # ── Sync status ────────────────────────────────────────────────────────
 
+    _SYNC_STALE_MINUTES = 10
+
     def get_sync_status(self, user_id: str) -> dict:
         doc = self._sync_status.find_one({"_id": user_id}, {"_id": 0})
-        return doc or {"status": "idle"}
+        if not doc:
+            return {"status": "idle"}
+        # Auto-recover from syncs that crashed mid-way
+        if doc.get("status") == "syncing" and doc.get("started_at"):
+            try:
+                started = datetime.fromisoformat(doc["started_at"])
+                age = (datetime.now(timezone.utc) - started).total_seconds()
+                if age > self._SYNC_STALE_MINUTES * 60:
+                    doc["status"] = "error"
+                    doc["error"] = "Sync timed out — please try again."
+                    self._sync_status.update_one(
+                        {"_id": user_id},
+                        {"$set": {"status": "error", "error": doc["error"]}},
+                    )
+            except (ValueError, TypeError):
+                pass
+        return doc
 
     def update_sync_status(self, user_id: str, update: dict) -> None:
         self._sync_status.update_one(

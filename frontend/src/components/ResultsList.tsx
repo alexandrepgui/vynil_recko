@@ -22,7 +22,7 @@ export default function ResultsList({ results, itemId }: Props) {
   return (
     <div className="results-list">
       {visible.map((r, i) => (
-        <ResultCard key={`${r.discogs_url}-${i}`} result={r} itemId={itemId} />
+        <ResultCard key={`${r.discogs_url}-${i}`} result={r} itemId={itemId} style={{ animationDelay: `${i * 80}ms` }} />
       ))}
 
       {hasMore && (

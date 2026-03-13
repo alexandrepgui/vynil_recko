@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { getAllReviewItems, getCollectionSyncStatus, searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
@@ -187,10 +187,10 @@ function PublicCollectionPage() {
   return (
     <div className="app public-collection-page">
       <nav className="app-navbar">
-        <div className="navbar-logo">
+        <a href="/" className="navbar-logo">
           <img src={logoIcon} alt="" className="navbar-icon" />
           <span className="navbar-wordmark">groove log</span>
-        </div>
+        </a>
       </nav>
       <CollectionView readOnly username={username} />
     </div>
@@ -219,6 +219,7 @@ function SmartRedirect() {
 
 function AppInner() {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -269,7 +270,7 @@ function AppInner() {
         </div>
       </nav>
 
-      <div className="route-content">
+      <div className="route-content" key={location.pathname.split('/')[1] || 'home'}>
         <Routes>
           <Route path="/" element={<SmartRedirect />} />
           <Route path="/identify/*" element={<IdentifyPage />} />
