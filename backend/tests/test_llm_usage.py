@@ -23,10 +23,12 @@ class TestLLMUsageRecord:
         assert record.cost_usd == 0.0
         assert record.cache_hit is False
         assert record.batch_id is None
+        assert record.user_id == ""
         assert record.record_id  # auto-generated UUID
 
     def test_to_dict(self):
         record = LLMUsageRecord(
+            user_id="u1",
             provider="openrouter",
             model="google/gemini-2.5-flash",
             operation="label_reading",
@@ -39,11 +41,13 @@ class TestLLMUsageRecord:
         assert d["provider"] == "openrouter"
         assert d["model"] == "google/gemini-2.5-flash"
         assert d["cost_usd"] == 0.000155
+        assert d["user_id"] == "u1"
 
     def test_from_dict(self):
         data = {
             "record_id": "test-id",
             "timestamp": "2026-03-06T00:00:00Z",
+            "user_id": "u1",
             "provider": "google",
             "model": "google/gemini-2.5-flash",
             "operation": "ranking",
@@ -59,9 +63,11 @@ class TestLLMUsageRecord:
         assert record.record_id == "test-id"
         assert record.provider == "google"
         assert record.total_tokens == 280
+        assert record.user_id == "u1"
 
     def test_roundtrip(self):
         record = LLMUsageRecord(
+            user_id="u1",
             provider="openrouter",
             model="google/gemini-2.5-flash",
             operation="label_reading",
@@ -74,6 +80,7 @@ class TestLLMUsageRecord:
         restored = LLMUsageRecord.from_dict(d)
         assert restored.provider == record.provider
         assert restored.cost_usd == record.cost_usd
+        assert restored.user_id == record.user_id
 
 
 # ── Cost calculation ─────────────────────────────────────────────────────────
@@ -132,7 +139,7 @@ class TestLogLLMUsage:
             provider="openrouter",
         )
         with patch("services.search.get_repo", return_value=mock_repo):
-            _log_llm_usage("label_reading", resp, batch_id="b1", item_id="i1")
+            _log_llm_usage("label_reading", resp, batch_id="b1", item_id="i1", user_id="u1")
 
         mock_repo.save_llm_usage.assert_called_once()
         record = mock_repo.save_llm_usage.call_args[0][0]
@@ -140,6 +147,7 @@ class TestLogLLMUsage:
         assert record.operation == "label_reading"
         assert record.provider == "openrouter"
         assert record.batch_id == "b1"
+        assert record.user_id == "u1"
         assert record.cache_hit is False
 
     def test_swallows_exceptions(self):
@@ -156,14 +164,14 @@ class TestLogLLMUsage:
 
 class TestUsageEndpoint:
     @pytest.fixture()
-    def client(self):
+    def client(self, mock_jwt_user):
         from main import app
         from deps import get_repo
 
         mock_repo = MagicMock()
         app.dependency_overrides[get_repo] = lambda: mock_repo
         yield TestClient(app), mock_repo
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_repo, None)
 
     def test_get_usage_returns_summary(self, client):
         test_client, mock_repo = client
@@ -190,4 +198,4 @@ class TestUsageEndpoint:
         resp = test_client.get("/api/usage?days=7")
 
         assert resp.status_code == 200
-        mock_repo.get_usage_summary.assert_called_once_with(days=7)
+        mock_repo.get_usage_summary.assert_called_once_with("test-user-123", days=7)

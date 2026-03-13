@@ -3,7 +3,11 @@ import { getAllReviewItems } from '../api';
 import type { BatchItem } from '../types';
 import BatchReview from './BatchReview';
 
-export default function ReviewView() {
+interface ReviewViewProps {
+  onCountChange?: () => void;
+}
+
+export default function ReviewView({ onCountChange }: ReviewViewProps) {
   const [items, setItems] = useState<BatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,12 +18,13 @@ export default function ReviewView() {
     try {
       const unreviewed = await getAllReviewItems('unreviewed');
       setItems(unreviewed);
+      onCountChange?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load review items.');
+      setError(e instanceof Error ? e.message : 'Couldn\'t load the review queue. Try refreshing?');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onCountChange]);
 
   useEffect(() => {
     loadItems();
@@ -41,8 +46,8 @@ export default function ReviewView() {
   if (items.length === 0) {
     return (
       <div className="batch-summary">
-        <h3>Nothing to review</h3>
-        <p>Upload images via Single Search or Batch to get started.</p>
+        <h3>All caught up</h3>
+        <p>All caught up. Upload photos to identify more records.</p>
       </div>
     );
   }

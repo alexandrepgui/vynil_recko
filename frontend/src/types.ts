@@ -1,6 +1,18 @@
 export type MediaType = 'vinyl' | 'cd';
 
-export interface AuthStatus {
+export interface UserProfile {
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  discogs: {
+    oauth_configured: boolean;
+    connected: boolean;
+    username: string | null;
+  };
+}
+
+export interface DiscogsStatus {
   oauth_configured: boolean;
   authenticated: boolean;
   username: string | null;
@@ -27,6 +39,8 @@ export interface DiscogsResult {
   catno: string | null;
   discogs_url: string | null;
   cover_image: string | null;
+  master_id: number | null;
+  is_master_fallback: boolean;
 }
 
 export interface DebugInfo {
@@ -57,6 +71,7 @@ export interface CollectionItem {
   styles: string[];
   format: string;
   cover_image: string | null;
+  master_id: number | null;
   date_added: string | null;
 }
 
@@ -75,6 +90,26 @@ export interface SyncStatus {
   total_items?: number;
   items_synced?: number;
   error?: string | null;
+}
+
+// Default user settings (sync with backend/config.py DEFAULT_USER_SETTINGS)
+export const DEFAULT_USER_SETTINGS = { collection_public: false, dark_mode: true } as const;
+
+export interface UserSettings {
+  collection_public: boolean;
+  dark_mode?: boolean;
+}
+
+export interface PublicCollectionResponse {
+  owner: {
+    username: string;
+    avatar_url?: string | null;
+  };
+  items: CollectionItem[];
+  page: number;
+  pages: number;
+  per_page: number;
+  total_items: number;
 }
 
 export interface Batch {

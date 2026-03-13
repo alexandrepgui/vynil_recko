@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getAuthStatus, logout, startOAuthLogin } from '../api';
-import type { AuthStatus } from '../types';
+import { getDiscogsStatus, discogsLogout, startDiscogsLogin } from '../api';
+import type { DiscogsStatus } from '../types';
+import { isValidDiscogsUrl } from '../utils';
 
 export default function DiscogsAuth() {
-  const [status, setStatus] = useState<AuthStatus | null>(null);
+  const [status, setStatus] = useState<DiscogsStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const s = await getAuthStatus();
+      const s = await getDiscogsStatus();
       setStatus(s);
       return s;
     } catch {
@@ -28,20 +29,25 @@ export default function DiscogsAuth() {
     setLoading(true);
     setError(null);
     try {
-      const authorizeUrl = await startOAuthLogin();
+      const authorizeUrl = await startDiscogsLogin();
+      if (!isValidDiscogsUrl(authorizeUrl)) {
+        setError('Something went wrong with Discogs authentication. Try again?');
+        setLoading(false);
+        return;
+      }
       window.location.href = authorizeUrl;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start login');
+      setError(e instanceof Error ? e.message : 'Couldn\'t connect to Discogs. Try again?');
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await discogsLogout();
       setStatus({ ...status, authenticated: false, username: null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to logout');
+      setError(e instanceof Error ? e.message : 'Couldn\'t disconnect from Discogs. Try again?');
     }
   };
 

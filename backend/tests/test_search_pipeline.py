@@ -5,7 +5,13 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from conftest import FAKE_RANKING, make_discogs_response, make_mock_llm_client
-from services.search import _SPACER_GIF, _build_debug, process_single_image
+from services.discogs_auth import OAuthTokens
+from config import DISCOGS_SPACER_GIF
+from services.search import _build_debug, process_single_image
+
+_SPACER_GIF = DISCOGS_SPACER_GIF  # For backward compatibility with existing test assertions
+
+_FAKE_TOKENS = OAuthTokens(access_token="t", access_token_secret="s", username="testuser")
 
 # Default release used by tests that don't need custom releases.
 _DEFAULT_RELEASE = {
@@ -34,12 +40,12 @@ def _run_pipeline(label_data, discogs_results=None, ranking=None):
 
     with (
         patch("services.vision._get_client", return_value=mock_client),
-        patch("services.discogs.requests.get", return_value=discogs_resp),
+        patch("services.discogs._session.get", return_value=discogs_resp),
         patch("services.vision._read_cache", return_value=None),
         patch("services.vision._write_cache"),
         patch("services.search.get_repo", return_value=mock_repo),
     ):
-        return process_single_image(b"fake-image", "image/jpeg")
+        return process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
 
 _UNSET = object()
@@ -107,14 +113,15 @@ class TestSelfTitledLogic:
 
 
 class TestCoverImageTiebreaker:
-    def test_promotes_result_with_cover_image(self):
+    def test_promotes_result_with_cover_same_catno(self):
+        """Same catno: result with cover should be promoted above one without."""
         releases = [
             {"id": 1, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C1", "uri": "/release/1", "cover_image": None},
+             "catno": "CS 8163", "uri": "/release/1", "cover_image": None},
             {"id": 2, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C2", "uri": "/release/2", "cover_image": "https://example.com/cover.jpg"},
+             "catno": "CS 8163", "uri": "/release/2", "cover_image": "https://example.com/cover.jpg"},
         ]
         resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1], "discarded": []})
         assert resp.results[0].cover_image == "https://example.com/cover.jpg"
@@ -124,22 +131,23 @@ class TestCoverImageTiebreaker:
         releases = [
             {"id": 1, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C1", "uri": "/release/1", "cover_image": "https://example.com/cover1.jpg"},
+             "catno": "CS 8163", "uri": "/release/1", "cover_image": "https://example.com/cover1.jpg"},
             {"id": 2, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C2", "uri": "/release/2", "cover_image": "https://example.com/cover2.jpg"},
+             "catno": "CS 8163", "uri": "/release/2", "cover_image": "https://example.com/cover2.jpg"},
         ]
         resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1], "discarded": []})
         assert resp.results[0].discogs_id == 1
 
-    def test_no_swap_when_titles_differ(self):
+    def test_no_swap_when_different_catno_and_title(self):
+        """Different albums (different catno + title) should not be reordered."""
         releases = [
             {"id": 1, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C1", "uri": "/release/1", "cover_image": None},
+             "catno": "CS 8163", "uri": "/release/1", "cover_image": None},
             {"id": 2, "title": "Miles Davis - Bitches Brew", "year": "1970",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C2", "uri": "/release/2", "cover_image": "https://example.com/cover.jpg"},
+             "catno": "GP 26", "uri": "/release/2", "cover_image": "https://example.com/cover.jpg"},
         ]
         resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1], "discarded": []})
         assert resp.results[0].discogs_id == 1
@@ -150,10 +158,10 @@ class TestCoverImageTiebreaker:
         releases = [
             {"id": 1, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C1", "uri": "/release/1", "cover_image": spacer},
+             "catno": "CS 8163", "uri": "/release/1", "cover_image": spacer},
             {"id": 2, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C2", "uri": "/release/2", "cover_image": "https://i.discogs.com/real-cover.jpg"},
+             "catno": "CS 8163", "uri": "/release/2", "cover_image": "https://i.discogs.com/real-cover.jpg"},
         ]
         resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1], "discarded": []})
         assert resp.results[0].discogs_id == 2
@@ -161,22 +169,36 @@ class TestCoverImageTiebreaker:
         assert resp.results[1].discogs_id == 1
         assert resp.results[1].cover_image is None
 
-    def test_promotes_image_across_multiple_same_title(self):
-        """Image results bubble up even when more than two share the same title."""
+    def test_promotes_image_across_multiple_same_catno(self):
+        """Image results bubble up even when more than two share the same catno."""
         releases = [
             {"id": 1, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C1", "uri": "/release/1", "cover_image": None},
+             "catno": "CS 8163", "uri": "/release/1", "cover_image": None},
             {"id": 2, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C2", "uri": "/release/2", "cover_image": None},
+             "catno": "CS 8163", "uri": "/release/2", "cover_image": None},
             {"id": 3, "title": "Miles Davis - Kind of Blue", "year": "1959",
              "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
-             "catno": "C3", "uri": "/release/3", "cover_image": "https://example.com/cover.jpg"},
+             "catno": "CS 8163", "uri": "/release/3", "cover_image": "https://example.com/cover.jpg"},
         ]
         resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1, 2], "discarded": []})
         assert resp.results[0].discogs_id == 3
         assert resp.results[0].cover_image == "https://example.com/cover.jpg"
+
+    def test_title_fallback_grouping(self):
+        """When catno differs, fall back to normalized title for grouping."""
+        releases = [
+            {"id": 1, "title": "Miles Davis - Kind of Blue (1959)", "year": "1959",
+             "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
+             "catno": "C1", "uri": "/release/1", "cover_image": None},
+            {"id": 2, "title": "Miles Davis - Kind of Blue", "year": "1959",
+             "country": "US", "format": ["Vinyl"], "label": ["Columbia"],
+             "catno": "C2", "uri": "/release/2", "cover_image": "https://example.com/cover.jpg"},
+        ]
+        resp = _run_pipeline(_make_label(), releases, {"likeliness": [0, 1], "discarded": []})
+        # Different catnos, different titles → no swap
+        assert resp.results[0].discogs_id == 1
 
 
 # ── Strategy fallthrough ──────────────────────────────────────────────────────
@@ -216,7 +238,7 @@ class TestStrategyFallthrough:
             patch("services.search.get_repo", return_value=mock_repo),
             patch("services.search.generate_search_candidates", side_effect=fake_generator),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 1
         assert resp.results[0].discogs_id == 2
@@ -247,7 +269,7 @@ class TestStrategyFallthrough:
             patch("services.search.get_repo", return_value=mock_repo),
             patch("services.search.generate_search_candidates", side_effect=fake_generator),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 0
         assert resp.results == []
@@ -265,12 +287,12 @@ class TestNoResults:
 
         with (
             patch("services.vision._get_client", return_value=mock_client),
-            patch("services.discogs.requests.get", return_value=discogs_resp),
+            patch("services.discogs._session.get", return_value=discogs_resp),
             patch("services.vision._read_cache", return_value=None),
             patch("services.vision._write_cache"),
             patch("services.search.get_repo", return_value=mock_repo),
         ):
-            resp = process_single_image(b"fake-image", "image/jpeg")
+            resp = process_single_image(b"fake-image", "image/jpeg", tokens=_FAKE_TOKENS)
 
         assert resp.total == 0
         assert resp.results == []

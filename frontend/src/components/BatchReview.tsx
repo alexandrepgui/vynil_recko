@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { addToCollection, reviewItemGlobal, undoReviewItem } from '../api';
-import type { BatchItem, DebugInfo } from '../types';
+import type { BatchItem, DebugInfo, LabelData } from '../types';
 import ResultCard from './ResultCard';
 import ZoomableImage from './ZoomableImage';
 
@@ -9,7 +9,7 @@ interface Props {
   onDone: () => void;
 }
 
-function DebugPanel({ debug }: { debug: DebugInfo }) {
+function DebugPanel({ debug, strategy, labelData }: { debug: DebugInfo; strategy?: string | null; labelData?: LabelData | null }) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -24,12 +24,31 @@ function DebugPanel({ debug }: { debug: DebugInfo }) {
       </button>
       {open && (
         <div className="debug-content">
+          {strategy && (
+            <div className="debug-row">
+              <strong>Winning strategy:</strong> {strategy}
+            </div>
+          )}
           <div className="debug-row">
             <strong>Timing:</strong>{' '}
             vision {debug.timing_ms.vision}ms
             {debug.timing_ms.search != null && <> | search {debug.timing_ms.search}ms</>}
             {debug.timing_ms.ranking != null && <> | ranking {debug.timing_ms.ranking}ms</>}
           </div>
+          {labelData && (
+            <div className="debug-row">
+              <strong>LLM extraction:</strong>{' '}
+              {[
+                labelData.artists?.length && `artists: ${labelData.artists.join(', ')}`,
+                labelData.albums?.length && `albums: ${labelData.albums.join(', ')}`,
+                labelData.tracks?.length && `${labelData.tracks.length} track(s)`,
+                labelData.catno && `catno: ${labelData.catno}`,
+                labelData.label && `label: ${labelData.label}`,
+                labelData.year && `year: ${labelData.year}`,
+                labelData.country && `country: ${labelData.country}`,
+              ].filter(Boolean).join(' · ') || 'no data'}
+            </div>
+          )}
           {debug.prefilter && (
             <div className="debug-row">
               <strong>Prefilter:</strong> {debug.prefilter.before} → {debug.prefilter.after} releases
@@ -60,10 +79,33 @@ function DebugPanel({ debug }: { debug: DebugInfo }) {
 
 export default function BatchReview({ items, onDone }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   // Track items acted on in this session: item_id -> action
   const [acted, setActed] = useState<Map<string, 'accepted' | 'skipped' | 'wrong'>>(new Map());
+  const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
+  const [transitioning, setTransitioning] = useState(false);
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('left');
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const cardRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) observerRef.current.disconnect();
+    if (node) {
+      setCardHeight(node.offsetHeight);
+      observerRef.current = new ResizeObserver(() => setCardHeight(node.offsetHeight));
+      observerRef.current.observe(node);
+    }
+  }, []);
+
+  const navigate = useCallback((nextIndex: number) => {
+    const dir = nextIndex > currentIndex ? 'left' : 'right';
+    setSlideDir(dir);
+    setTransitioning(true);
+    setTimeout(() => {
+      setCurrentIndex(nextIndex);
+      setExpanded(true);
+      setTransitioning(false);
+    }, 180);
+  }, [currentIndex]);
 
   const completedItems = items.filter((i) => i.status === 'completed' && i.review_status === 'unreviewed');
   const reviewable = completedItems.filter((i) => !acted.has(i.item_id));
@@ -103,10 +145,10 @@ export default function BatchReview({ items, onDone }: Props) {
         }
       }
       setActed((prev) => new Map(prev).set(item.item_id, action));
-      setExpanded(false);
-      // Auto-advance to next item
+      setExpanded(true);
+      // Auto-advance to next item with slide transition
       if (safeIndex < completedItems.length - 1) {
-        setCurrentIndex((i) => i + 1);
+        navigate(safeIndex + 1);
       }
     } finally {
       setActionLoading(false);
@@ -137,7 +179,7 @@ export default function BatchReview({ items, onDone }: Props) {
         for (const ri of reviewable) next.set(ri.item_id, 'skipped');
         return next;
       });
-      setExpanded(false);
+      setExpanded(true);
     } finally {
       setActionLoading(false);
     }
@@ -167,7 +209,7 @@ export default function BatchReview({ items, onDone }: Props) {
         for (const ri of reviewable) next.set(ri.item_id, 'accepted');
         return next;
       });
-      setExpanded(false);
+      setExpanded(true);
     } finally {
       setActionLoading(false);
     }
@@ -197,30 +239,42 @@ export default function BatchReview({ items, onDone }: Props) {
         )}
       </div>
 
-      {topResult ? (
-        <ResultCard
-          result={topResult}
-          className="batch-review-featured"
-          renderActions={(r) => (
-            <>
-              {r.discogs_url && (
-                <a href={r.discogs_url} target="_blank" rel="noopener noreferrer" className="btn btn-discogs">
-                  See in Discogs
-                </a>
+      <div className={`batch-review-main ${transitioning ? (slideDir === 'left' ? 'batch-slide-out-left' : 'batch-slide-out-right') : 'batch-slide-in'}`}>
+        {topResult ? (
+          <div ref={cardRef} style={{ flex: 1, minWidth: 0 }}>
+            <ResultCard
+              result={topResult}
+              className="batch-review-featured"
+              renderActions={(r) => (
+                <>
+                  {r.discogs_url && (
+                    <a href={r.discogs_url} target="_blank" rel="noopener noreferrer" className="btn btn-discogs">
+                      See in Discogs
+                    </a>
+                  )}
+                </>
               )}
-            </>
-          )}
-        />
-      ) : (
-        <p className="batch-review-no-results">No results found for this image.</p>
-      )}
+            />
+          </div>
+        ) : (
+          <p className="batch-review-no-results">No results found for this image.</p>
+        )}
+        {item.image_url && cardHeight && (
+          <ZoomableImage
+            src={item.image_url}
+            alt={item.image_filename}
+            className="batch-review-photo"
+            style={{ height: cardHeight }}
+          />
+        )}
+      </div>
 
       <div className="batch-review-actions">
         <div className="batch-review-actions-row">
           <button
             className="btn btn-nav"
-            disabled={safeIndex === 0}
-            onClick={() => { setCurrentIndex((i) => i - 1); setExpanded(false); }}
+            disabled={safeIndex === 0 || transitioning}
+            onClick={() => navigate(safeIndex - 1)}
           >
             &lt;
           </button>
@@ -241,14 +295,14 @@ export default function BatchReview({ items, onDone }: Props) {
             <>
               <button
                 className="btn btn-wrong"
-                disabled={actionLoading}
+                disabled={actionLoading || transitioning}
                 onClick={() => handleAction('wrong')}
               >
                 Wrong
               </button>
               <button
                 className="btn btn-dismiss"
-                disabled={actionLoading}
+                disabled={actionLoading || transitioning}
                 onClick={() => handleAction('skipped')}
               >
                 Dismiss
@@ -256,7 +310,7 @@ export default function BatchReview({ items, onDone }: Props) {
               {topResult?.discogs_id && (
                 <button
                   className="btn btn-collection"
-                  disabled={actionLoading}
+                  disabled={actionLoading || transitioning}
                   onClick={() => handleAction('accepted', topResult.discogs_id!)}
                 >
                   {actionLoading ? 'Adding...' : 'Accept + Add'}
@@ -266,8 +320,8 @@ export default function BatchReview({ items, onDone }: Props) {
           )}
           <button
             className="btn btn-nav"
-            disabled={safeIndex >= completedItems.length - 1}
-            onClick={() => { setCurrentIndex((i) => i + 1); setExpanded(false); }}
+            disabled={safeIndex >= completedItems.length - 1 || transitioning}
+            onClick={() => navigate(safeIndex + 1)}
           >
             &gt;
           </button>
@@ -284,8 +338,8 @@ export default function BatchReview({ items, onDone }: Props) {
         )}
       </div>
 
-      {!itemAction && expanded && item.results && (
-        <div className="batch-expanded-results">
+      {!itemAction && item.results && item.results.length > 1 && (
+        <div className={`batch-expanded-results ${expanded ? 'expanded-visible' : ''}`}>
           {item.results.slice(1).map((r, i) => (
             <ResultCard
               key={`${r.discogs_id}-${i}`}
@@ -303,7 +357,7 @@ export default function BatchReview({ items, onDone }: Props) {
                       disabled={actionLoading}
                       onClick={() => handleAction('accepted', r.discogs_id!)}
                     >
-                      Pick this
+                      Accept + Add
                     </button>
                   )}
                 </>
@@ -313,26 +367,9 @@ export default function BatchReview({ items, onDone }: Props) {
         </div>
       )}
 
-      {item.debug && <DebugPanel debug={item.debug} />}
+      {item.debug && <DebugPanel debug={item.debug} strategy={item.strategy} labelData={item.label_data} />}
 
-      {item.image_url && (
-        <div className="batch-review-photo-wrapper">
-          <ZoomableImage
-            src={item.image_url}
-            alt={item.image_filename}
-            className="batch-review-photo"
-          />
-        </div>
-      )}
 
-      <div className="batch-review-label-info">
-        <span className="batch-review-filename">{item.image_filename}</span>
-        {item.label_data && (
-          <span className="batch-review-extracted">
-            {item.label_data.artists.join(', ')} — {item.label_data.albums.join(', ')}
-          </span>
-        )}
-      </div>
 
       {reviewable.length === 0 && acted.size > 0 && (
         <div className="batch-review-done-hint">

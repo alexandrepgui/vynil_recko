@@ -5,6 +5,8 @@ requests
 python-dotenv
 pymongo
 google-genai
+PyJWT[crypto]
 pytest
 pytest-cov
 httpx
+pillow

@@ -28,7 +28,12 @@ UPLOADS_DIR = Path(__file__).resolve().parent / ".uploads"
 DISCOGS_BASE_URL = "https://api.discogs.com"
 DISCOGS_USER_AGENT = "VynilRecko/1.0"
 
+DISCOGS_SPACER_GIF = "spacer.gif"  # Placeholder image filename (no real cover)
+
 MAX_RANKING_RESULTS = 20
+
+# Default user settings (also used in frontend types.ts for sync)
+DEFAULT_USER_SETTINGS = {"collection_public": False, "dark_mode": True}
 
 DEV_MODE = os.getenv("DEV_MODE", "").lower() in ("1", "true", "yes")
 
@@ -42,6 +47,8 @@ VINYL_LABEL_READING_PROMPT = (
     "Look at this vinyl record label image. "
     "Extract as much information as possible. "
     "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
+    "Each variation must be a genuinely different name (e.g. 'João Gilberto' vs 'Joao Gilberto', or 'Miles Davis Quintet' vs 'Miles Davis'). "
+    "Do NOT include the same name in different cases — 'IVAN LINS' and 'Ivan Lins' are the same, include only ONE using the standard capitalization. "
     "For albums: include the full title, shorter versions without subtitles, and any plausible variations. "
     "For artists: include variations (e.g. with/without featured artists). "
     "Do NOT confuse manufacturer, publisher, or production company names (e.g. 'Atividades Artísticas', 'Produções', 'Entertainment LLC') with artist names. "
@@ -68,6 +75,8 @@ CD_LABEL_READING_PROMPT = (
     "Look at this CD image (disc, jewel case, or booklet). "
     "Extract as much information as possible. "
     "Return multiple possible variations ordered from most likely to least likely for albums and artists. "
+    "Each variation must be a genuinely different name (e.g. 'João Gilberto' vs 'Joao Gilberto', or 'Miles Davis Quintet' vs 'Miles Davis'). "
+    "Do NOT include the same name in different cases — 'IVAN LINS' and 'Ivan Lins' are the same, include only ONE using the standard capitalization. "
     "For albums: include the full title, shorter versions without subtitles, and any plausible variations. "
     "For artists: include variations (e.g. with/without featured artists). "
     "Do NOT confuse manufacturer, publisher, or production company names (e.g. 'Atividades Artísticas', 'Produções', 'Entertainment LLC') with artist names. "

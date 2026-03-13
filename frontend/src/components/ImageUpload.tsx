@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import type { MediaType } from '../types';
+import { useToast } from './Toast';
 
 interface Props {
   onFileSelected: (file: File) => void;
@@ -15,15 +16,21 @@ export default function ImageUpload({ onFileSelected, onClear, isLoading, mediaT
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const { showToast } = useToast();
 
   const stageFile = useCallback((file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      alert('Please upload a JPEG or PNG image.');
+      showToast('Please upload a JPEG or PNG image.', 'error');
+      return;
+    }
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      showToast('Image must be under 5 MB.', 'error');
       return;
     }
     setStagedFile(file);
     setPreview(URL.createObjectURL(file));
-  }, []);
+  }, [showToast]);
 
   const handleClear = useCallback(() => {
     setStagedFile(null);
@@ -91,6 +98,7 @@ export default function ImageUpload({ onFileSelected, onClear, isLoading, mediaT
           <img src={preview} alt="Label preview" className="upload-preview" />
         ) : (
           <div className="upload-placeholder">
+            <div className="upload-placeholder-icon" aria-hidden="true" />
             <p>Drop or paste a {mediaType === 'cd' ? 'CD' : 'vinyl label'} image here</p>
             <p className="upload-hint">or click to browse (JPEG / PNG)</p>
           </div>

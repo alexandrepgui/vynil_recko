@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import os
 
@@ -82,6 +83,29 @@ def _evict_if_needed() -> None:
         log.info("Cache EVICT: %s", oldest.name)
 
 
+def _enhance_image(image_bytes: bytes, mime_type: str) -> tuple[bytes, str]:
+    """Enhance label photo for better LLM readability.
+
+    Applies auto-contrast and sharpening to improve text legibility on
+    low-quality vinyl/CD label photos. Returns (enhanced_bytes, mime_type).
+    """
+    from PIL import Image, ImageEnhance, ImageOps
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img = ImageOps.autocontrast(img, cutoff=1)
+        img = ImageEnhance.Sharpness(img).enhance(1.5)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        log.debug("Image enhanced: %d → %d bytes", len(image_bytes), buf.tell())
+        return buf.getvalue(), "image/jpeg"
+    except Exception as e:
+        log.warning("Image enhancement failed, using original: %s", e)
+        return image_bytes, mime_type
+
+
 def _chat(messages: list[dict]) -> tuple[str, list[dict], LLMResponse]:
     """Send messages to the LLM and return (response_text, updated_messages, llm_response)."""
     client = _get_client()
@@ -113,16 +137,19 @@ def read_label_image(
     """
     log.info("Reading label image: size=%d bytes, mime=%s, media_type=%s", len(image_bytes), mime_type, media_type)
 
+    # Enhance image for better LLM readability (cache key uses original bytes)
+    enhanced_bytes, enhanced_mime = _enhance_image(image_bytes, mime_type)
+
     # Check cache first
     cached = _read_cache(image_bytes, media_type)
     if cached is not None:
         # Rebuild a minimal conversation so rank_results can append to it
-        b64_image = base64.b64encode(image_bytes).decode()
+        b64_image = base64.b64encode(enhanced_bytes).decode()
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_image}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:{enhanced_mime};base64,{b64_image}"}},
                     {"type": "text", "text": "(label reading prompt — cached)"},
                 ],
             },
@@ -130,7 +157,7 @@ def read_label_image(
         ]
         return cached, messages, True, None
 
-    b64_image = base64.b64encode(image_bytes).decode()
+    b64_image = base64.b64encode(enhanced_bytes).decode()
 
     messages = [
         {
@@ -138,7 +165,7 @@ def read_label_image(
             "content": [
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{b64_image}"},
+                    "image_url": {"url": f"data:{enhanced_mime};base64,{b64_image}"},
                 },
                 {"type": "text", "text": LABEL_READING_PROMPTS[media_type]},
             ],

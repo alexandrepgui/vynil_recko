@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: install backend frontend dev docker-dev stop test test-coverage full-test mongo
+.PHONY: install backend frontend dev docker-dev stop test test-coverage full-test mongo supabase
 
 NVM := . $(HOME)/.config/nvm/nvm.sh &&
 
@@ -8,12 +8,20 @@ install:
 	$(NVM) cd frontend && npm install
 
 mongo:
-	@if docker ps --format '{{.Names}}' | grep -q '^vinyl-recko-mongo$$'; then \
+	@if docker ps --format '{{.Names}}' | grep -q '^groove-log-mongo$$'; then \
 		echo "MongoDB already running"; \
 	else \
 		echo "Starting MongoDB..."; \
-		docker start vinyl-recko-mongo 2>/dev/null || \
-		docker run -d --name vinyl-recko-mongo -p 27017:27017 -v vinyl_recko_mongo_data:/data/db mongo:7 > /dev/null; \
+		docker start groove-log-mongo 2>/dev/null || \
+		docker run -d --name groove-log-mongo -p 27017:27017 -v groove_log_mongo_data:/data/db mongo:7 > /dev/null; \
+	fi
+
+supabase:
+	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
+		echo "Supabase already running"; \
+	else \
+		echo "Starting Supabase..."; \
+		npx supabase start; \
 	fi
 
 backend:
@@ -24,12 +32,14 @@ frontend:
 
 dev:
 	@$(MAKE) mongo
+	@$(MAKE) supabase
 	@trap 'kill 0' EXIT; \
 	$(MAKE) backend & \
 	$(MAKE) frontend & \
 	for pid in $$(jobs -p); do wait $$pid || exit $$?; done
 
 docker-dev:
+	@$(MAKE) supabase
 	docker compose up --build
 
 test:
@@ -45,5 +55,6 @@ full-test:
 stop:
 	@lsof -ti:8000 | xargs kill 2>/dev/null; true
 	@lsof -ti:5173 | xargs kill 2>/dev/null; true
-	@docker stop vinyl-recko-mongo 2>/dev/null; true
+	@docker stop groove-log-mongo 2>/dev/null; true
+	@npx supabase stop 2>/dev/null; true
 	@echo "Stopped"

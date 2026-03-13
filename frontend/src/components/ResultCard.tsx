@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { addToCollection, getPrice, reviewItemGlobal, undoReviewItem } from '../api';
 import type { DiscogsResult } from '../types';
 import { parseDiscogsTitle } from '../utils';
@@ -11,17 +11,20 @@ interface Props {
   renderActions?: (result: DiscogsResult) => ReactNode;
   /** Optional extra CSS class */
   className?: string;
+  /** Optional inline styles (e.g. animation delay) */
+  style?: CSSProperties;
 }
 
-export default function ResultCard({ result, itemId, renderActions, className }: Props) {
+export default function ResultCard({ result, itemId, renderActions, className, style }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'added' | 'error' | 'dismissed'>('idle');
   const [price, setPrice] = useState<{ lowest_price: number | null; num_for_sale: number; currency: string | null } | null>(null);
+  const [priceFailed, setPriceFailed] = useState(false);
 
   const { artist, album: albumTitle } = parseDiscogsTitle(result.title);
 
   useEffect(() => {
     if (!result.discogs_id) return;
-    getPrice(result.discogs_id).then(setPrice).catch(() => {});
+    getPrice(result.discogs_id).then(setPrice).catch(() => setPriceFailed(true));
   }, [result.discogs_id]);
 
   const handleAddToCollection = async () => {
@@ -65,7 +68,7 @@ export default function ResultCard({ result, itemId, renderActions, className }:
   const acted = status === 'added' || status === 'dismissed';
 
   return (
-    <div className={`result-card ${acted ? 'result-card-acted' : ''} ${className ?? ''}`}>
+    <div className={`result-card ${acted ? 'result-card-acted' : ''} ${status === 'added' ? 'result-card-added' : ''} ${className ?? ''}`} style={style}>
       {result.cover_image && (
         <ZoomableImage
           className="result-cover"
@@ -85,8 +88,13 @@ export default function ResultCard({ result, itemId, renderActions, className }:
           {result.format && <span>{result.format}</span>}
           {result.label && <span>{result.label}</span>}
           {result.catno && <span>Cat# {result.catno}</span>}
-          {price?.lowest_price != null && (
+          {priceFailed ? (
+            <span className="result-price result-price-unavailable">Price unavailable</span>
+          ) : price?.lowest_price != null ? (
             <span className="result-price">From {price.lowest_price.toFixed(2)} {price.currency ?? ''} ({price.num_for_sale} for sale)</span>
+          ) : null}
+          {result.is_master_fallback && (
+            <span className="result-master-badge">Master release — exact pressing not found</span>
           )}
         </div>
 
@@ -96,8 +104,15 @@ export default function ResultCard({ result, itemId, renderActions, className }:
           <div className="result-actions">
             {acted ? (
               <>
-                <span className="result-acted-label">
-                  {status === 'added' ? 'Added' : 'Dismissed'}
+                <span className={`result-acted-label${status === 'added' ? ' result-acted-label-added' : ''}`}>
+                  {status === 'added' ? (
+                    <>
+                      <svg className="check-icon" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M3 8.5 L6.5 12 L13 4" />
+                      </svg>
+                      Added
+                    </>
+                  ) : 'Dismissed'}
                 </span>
                 {itemId && (
                   <button className="btn btn-undo" onClick={handleUndo}>
@@ -117,14 +132,14 @@ export default function ResultCard({ result, itemId, renderActions, className }:
                     See in Discogs
                   </a>
                 )}
-                {result.discogs_id && (
+                {result.discogs_id && !result.is_master_fallback && (
                   <button
                     className={`btn btn-collection ${status}`}
                     disabled={status === 'loading'}
                     onClick={handleAddToCollection}
                   >
                     {status === 'loading' ? 'Adding...' :
-                     status === 'error' ? 'Failed — Retry?' :
+                     status === 'error' ? 'Didn\'t work — try again?' :
                      'Add to collection'}
                   </button>
                 )}

@@ -16,7 +16,12 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.zip')) {
-        setError('Please upload a .zip file containing JPEG or PNG images.');
+        setError('That doesn\'t look like a .zip file. Try a .zip with JPEG or PNG images inside.');
+        return;
+      }
+      const MAX_ZIP_SIZE = 750 * 1024 * 1024; // 750 MB
+      if (file.size > MAX_ZIP_SIZE) {
+        alert('ZIP file must be under 750 MB.');
         return;
       }
       setError(null);
@@ -26,7 +31,7 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
         const { batch_id, total_images } = await uploadBatch(file, mediaType);
         onBatchCreated(batch_id, total_images);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Upload failed.');
+        setError(e instanceof Error ? e.message : 'Upload didn\'t work. Want to try again?');
       } finally {
         setIsUploading(false);
       }
@@ -68,8 +73,11 @@ export default function BatchUpload({ onBatchCreated, mediaType = 'vinyl' }: Pro
           <p>Uploading...</p>
         ) : (
           <>
-            <p>Drop a .zip of {mediaType === 'cd' ? 'CD' : 'vinyl label'} images here</p>
+            <p>Drop a <strong>.zip</strong> file here</p>
             <p className="upload-hint">or click to browse</p>
+            <p className="upload-hint">
+              Must contain {mediaType === 'cd' ? 'CD' : 'vinyl label'} photos (JPEG or PNG)
+            </p>
           </>
         )}
       </div>

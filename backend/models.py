@@ -51,6 +51,8 @@ class DiscogsResult(BaseModel):
     catno: str | None = None
     discogs_url: str | None = None
     cover_image: str | None = None
+    master_id: int | None = None
+    is_master_fallback: bool = False
 
 
 class AddToCollectionRequest(BaseModel):
