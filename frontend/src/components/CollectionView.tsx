@@ -66,9 +66,28 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [sortOrder, setSortOrder] = useState('asc');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [skeletonVisible, setSkeletonVisible] = useState(false);
+  const [skeletonFading, setSkeletonFading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(loadPageSize);
   const [group, setGroup] = useState(loadGroup);
+
+  // Skeleton fade-out: when loading ends, briefly keep skeleton with fade class
+  useEffect(() => {
+    if (loading) {
+      setSkeletonVisible(true);
+      setSkeletonFading(false);
+    } else if (skeletonVisible) {
+      // Start fading immediately
+      requestAnimationFrame(() => setSkeletonFading(true));
+      // Remove from DOM after the transition completes
+      const timer = setTimeout(() => {
+        setSkeletonVisible(false);
+        setSkeletonFading(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Public collection owner info
   const [ownerName, setOwnerName] = useState<string | null>(null);
@@ -116,6 +135,9 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       if (s.status === 'syncing') startPolling();
       setCollectionPublic(settings.collection_public);
       if (profile) setDiscogsUsername(profile.discogs.username ?? null);
+    }).catch(() => {
+      // Ensure loading screen clears even if something unexpected fails
+    }).finally(() => {
       setInitialCheckDone(true);
     });
 
@@ -624,8 +646,8 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         </div>
       )}
 
-      {loading && (
-        <div className="collection-grid" aria-hidden="true">
+      {skeletonVisible && (
+        <div className={`collection-grid${skeletonFading ? ' skeleton-fading-out' : ''}`} aria-hidden="true">
           {Array.from({ length: Math.min(pageSize, 25) }, (_, i) => (
             <div key={i} className="collection-card skeleton-card">
               <div className="skeleton-cover skeleton-shimmer" />
@@ -667,7 +689,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                       <div
                         key={`${item.release_id}-${item.instance_id}`}
                         className={`collection-card${!readOnly && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
-                        style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}
+                        style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
                         onClick={() => handleCardClick(item)}
                       >
                         {!readOnly && (
@@ -717,7 +739,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                 <div
                   key={`${item.release_id}-${item.instance_id}`}
                   className={`collection-card${!readOnly && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
-                  style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}
+                  style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
                   onClick={() => handleCardClick(item)}
                 >
                   {!readOnly && (

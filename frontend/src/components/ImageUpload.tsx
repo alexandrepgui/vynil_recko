@@ -98,6 +98,7 @@ export default function ImageUpload({ onFileSelected, onClear, isLoading, mediaT
           <img src={preview} alt="Label preview" className="upload-preview" />
         ) : (
           <div className="upload-placeholder">
+            <div className="upload-placeholder-icon" aria-hidden="true" />
             <p>Drop or paste a {mediaType === 'cd' ? 'CD' : 'vinyl label'} image here</p>
             <p className="upload-hint">or click to browse (JPEG / PNG)</p>
           </div>
