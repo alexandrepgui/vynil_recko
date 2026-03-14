@@ -19,3 +19,6 @@ Flag anything that looks off and ask for permission to fix it:
 - Potential bugs or fragile code spotted while working on nearby areas
 
 Don't silently fix these — call them out so the user can make an informed decision.
+
+## Testing
+Run `make full-test` after any backend change. If there are test failures, fix them — even if the failures are unrelated to the current session's work.
