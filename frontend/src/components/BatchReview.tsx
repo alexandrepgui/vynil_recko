@@ -79,7 +79,6 @@ function DebugPanel({ debug, strategy, labelData }: { debug: DebugInfo; strategy
 
 export default function BatchReview({ items, onDone }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [expanded, setExpanded] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   // Track items acted on in this session: item_id -> action
   const [acted, setActed] = useState<Map<string, 'accepted' | 'skipped' | 'wrong'>>(new Map());
@@ -102,7 +101,7 @@ export default function BatchReview({ items, onDone }: Props) {
     setTransitioning(true);
     setTimeout(() => {
       setCurrentIndex(nextIndex);
-      setExpanded(true);
+
       setTransitioning(false);
     }, 180);
   }, [currentIndex]);
@@ -145,7 +144,7 @@ export default function BatchReview({ items, onDone }: Props) {
         }
       }
       setActed((prev) => new Map(prev).set(item.item_id, action));
-      setExpanded(true);
+
       // Auto-advance to next item with slide transition
       if (safeIndex < completedItems.length - 1) {
         navigate(safeIndex + 1);
@@ -179,7 +178,7 @@ export default function BatchReview({ items, onDone }: Props) {
         for (const ri of reviewable) next.set(ri.item_id, 'skipped');
         return next;
       });
-      setExpanded(true);
+
     } finally {
       setActionLoading(false);
     }
@@ -209,7 +208,7 @@ export default function BatchReview({ items, onDone }: Props) {
         for (const ri of reviewable) next.set(ri.item_id, 'accepted');
         return next;
       });
-      setExpanded(true);
+
     } finally {
       setActionLoading(false);
     }
@@ -313,7 +312,7 @@ export default function BatchReview({ items, onDone }: Props) {
                   disabled={actionLoading || transitioning}
                   onClick={() => handleAction('accepted', topResult.discogs_id!)}
                 >
-                  {actionLoading ? 'Adding...' : 'Accept + Add'}
+                  {actionLoading ? 'Adding...' : 'Add to collection'}
                 </button>
               )}
             </>
@@ -326,20 +325,11 @@ export default function BatchReview({ items, onDone }: Props) {
             &gt;
           </button>
         </div>
-        {!itemAction && (item.results?.length ?? 0) > 1 && (
-          <div className="batch-review-actions-row">
-            <button
-              className="btn btn-show-more"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? 'Hide' : 'See all'} ({item.results!.length})
-            </button>
-          </div>
-        )}
       </div>
 
       {!itemAction && item.results && item.results.length > 1 && (
-        <div className={`batch-expanded-results ${expanded ? 'expanded-visible' : ''}`}>
+        <div className="batch-expanded-results expanded-visible">
+          <h4 className="batch-alt-heading">OTHER POSSIBLE MATCHES</h4>
           {item.results.slice(1).map((r, i) => (
             <ResultCard
               key={`${r.discogs_id}-${i}`}
@@ -357,7 +347,7 @@ export default function BatchReview({ items, onDone }: Props) {
                       disabled={actionLoading}
                       onClick={() => handleAction('accepted', r.discogs_id!)}
                     >
-                      Accept + Add
+                      Add to collection
                     </button>
                   )}
                 </>

@@ -242,6 +242,35 @@ def test_upsert_collection_items_bulk(repo):
     assert repo.upsert_collection_items_bulk(items) == 2
     repo._collection_items.bulk_write.assert_called_once()
 
+    # Verify $set is used (not ReplaceOne) — custom_cover_image is NOT in the payload
+    from pymongo import UpdateOne
+    ops = repo._collection_items.bulk_write.call_args[0][0]
+    for op in ops:
+        assert isinstance(op, UpdateOne)
+
+
+def test_upsert_collection_items_bulk_preserves_custom_cover(repo):
+    """Sync upsert uses $set and does not include custom_cover_image."""
+    from repository.models import CollectionItem
+    from pymongo import UpdateOne
+
+    item = CollectionItem(
+        user_id=USER_ID, instance_id=1, release_id=10, title="A",
+        custom_cover_image="https://example.com/custom.jpg",
+    )
+    mock_result = MagicMock()
+    mock_result.upserted_count = 1
+    mock_result.modified_count = 0
+    repo._collection_items.bulk_write.return_value = mock_result
+
+    repo.upsert_collection_items_bulk([item])
+    ops = repo._collection_items.bulk_write.call_args[0][0]
+    op = ops[0]
+    assert isinstance(op, UpdateOne)
+    # custom_cover_image should NOT be in the $set payload
+    set_payload = op._doc["$set"]
+    assert "custom_cover_image" not in set_payload
+
 
 def test_find_collection_items_default(repo):
     cursor = MagicMock()
@@ -316,6 +345,42 @@ def test_delete_collection_items(repo):
     filt = repo._collection_items.delete_many.call_args[0][0]
     assert filt["user_id"] == USER_ID
     assert filt["instance_id"] == {"$in": [100, 200]}
+
+
+def test_find_collection_item_found(repo):
+    repo._collection_items.find_one.return_value = {
+        "user_id": USER_ID, "instance_id": 100, "release_id": 555, "title": "A", "artist": "X",
+    }
+    result = repo.find_collection_item(USER_ID, 100)
+    assert result is not None
+    assert result.instance_id == 100
+    repo._collection_items.find_one.assert_called_once_with(
+        {"user_id": USER_ID, "instance_id": 100}, {"_id": 0},
+    )
+
+
+def test_find_collection_item_not_found(repo):
+    repo._collection_items.find_one.return_value = None
+    assert repo.find_collection_item(USER_ID, 999) is None
+
+
+def test_update_collection_item_cover_set(repo):
+    mock_result = MagicMock()
+    mock_result.modified_count = 1
+    repo._collection_items.update_one.return_value = mock_result
+    assert repo.update_collection_item_cover(USER_ID, 100, "https://example.com/img.jpg") is True
+    call = repo._collection_items.update_one.call_args
+    assert call[0][0] == {"user_id": USER_ID, "instance_id": 100}
+    assert call[0][1] == {"$set": {"custom_cover_image": "https://example.com/img.jpg"}}
+
+
+def test_update_collection_item_cover_clear(repo):
+    mock_result = MagicMock()
+    mock_result.modified_count = 1
+    repo._collection_items.update_one.return_value = mock_result
+    assert repo.update_collection_item_cover(USER_ID, 100, None) is True
+    call = repo._collection_items.update_one.call_args
+    assert call[0][1] == {"$set": {"custom_cover_image": None}}
 
 
 def test_find_collection_items_by_instance_ids_empty(repo):

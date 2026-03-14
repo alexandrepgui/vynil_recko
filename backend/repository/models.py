@@ -159,6 +159,7 @@ class CollectionItem:
     styles: list[str] = field(default_factory=list)
     format: str = ""
     cover_image: str | None = None
+    custom_cover_image: str | None = None
     master_id: int | None = None
     date_added: str | None = None
     synced_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -179,6 +180,7 @@ class CollectionItem:
             styles=data.get("styles", []),
             format=data.get("format", ""),
             cover_image=data.get("cover_image"),
+            custom_cover_image=data.get("custom_cover_image"),
             master_id=data.get("master_id"),
             date_added=data.get("date_added"),
             synced_at=data.get("synced_at", ""),

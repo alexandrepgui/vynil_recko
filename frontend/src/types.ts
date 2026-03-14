@@ -71,6 +71,7 @@ export interface CollectionItem {
   styles: string[];
   format: string;
   cover_image: string | null;
+  custom_cover_image: string | null;
   master_id: number | null;
   date_added: string | null;
 }

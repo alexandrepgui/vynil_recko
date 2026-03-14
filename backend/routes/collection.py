@@ -8,7 +8,7 @@ from deps import get_repo
 from logger import get_logger
 from repository.mongo import MongoRepository
 from services.collection_sync import sync_full_collection
-from services.discogs import remove_from_collection
+from services.discogs import get_master_cover, remove_from_collection
 from services.discogs_auth import require_discogs_tokens
 
 log = get_logger("routes.collection")
@@ -135,6 +135,87 @@ async def _run_sync(repo: MongoRepository, user_id: str, tokens) -> None:
         await asyncio.to_thread(sync_full_collection, repo, user_id, tokens)
     except Exception as e:
         log.error("Background sync failed for user_id=%s: %s", user_id, e, exc_info=True)
+
+
+# ── Cover art endpoints ──────────────────────────────────────────────────────
+
+
+@router.get("/api/collection/{instance_id}/cover/master")
+async def preview_master_cover(
+    instance_id: int,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    """Fetch master cover URL from Discogs for preview (does not persist)."""
+    item = repo.find_collection_item(user.id, instance_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if not item.master_id:
+        raise HTTPException(status_code=400, detail="This release has no master release.")
+
+    tokens = require_discogs_tokens(repo, user.id)
+    cover = await asyncio.to_thread(get_master_cover, item.master_id, tokens)
+    if not cover:
+        raise HTTPException(status_code=404, detail="No cover found for this master release.")
+
+    return {"cover_url": cover}
+
+
+@router.post("/api/collection/{instance_id}/cover/master")
+async def use_master_cover(
+    instance_id: int,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    """Fetch master cover from Discogs and set it as custom cover."""
+    item = repo.find_collection_item(user.id, instance_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if not item.master_id:
+        raise HTTPException(status_code=400, detail="This release has no master release.")
+
+    tokens = require_discogs_tokens(repo, user.id)
+    cover = await asyncio.to_thread(get_master_cover, item.master_id, tokens)
+    if not cover:
+        raise HTTPException(status_code=404, detail="No cover found for this master release.")
+
+    repo.update_collection_item_cover(user.id, instance_id, cover)
+    return {"custom_cover_image": cover}
+
+
+class SetCoverRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2048)
+
+
+@router.put("/api/collection/{instance_id}/cover")
+async def set_custom_cover(
+    instance_id: int,
+    body: SetCoverRequest,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    """Set a custom cover image URL."""
+    item = repo.find_collection_item(user.id, instance_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+
+    repo.update_collection_item_cover(user.id, instance_id, body.url)
+    return {"custom_cover_image": body.url}
+
+
+@router.delete("/api/collection/{instance_id}/cover")
+async def reset_cover(
+    instance_id: int,
+    user: User = Depends(get_current_user),
+    repo: MongoRepository = Depends(get_repo),
+):
+    """Reset cover to default (clear custom_cover_image)."""
+    item = repo.find_collection_item(user.id, instance_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+
+    repo.update_collection_item_cover(user.id, instance_id, None)
+    return {"custom_cover_image": None}
 
 
 # Public collection endpoint — placed last so /api/collection/sync is matched first.

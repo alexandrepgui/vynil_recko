@@ -10,7 +10,7 @@
   margin: 0 auto;
   padding: 0 clamp(1rem, 4vw, 5rem);
   padding-bottom: 3rem;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
   animation: fadeIn 0.3s ease;
 }
@@ -80,6 +80,8 @@ h2, h3 {
   text-decoration: none;
   border-bottom: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .nav-link:hover {
@@ -175,6 +177,8 @@ h2, h3 {
   color: var(--text-primary);
   text-decoration: none;
   transition: color 0.15s, border-color 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .subtab-icon {
@@ -348,23 +352,30 @@ h2, h3 {
 .btn-submit {
   background: var(--accent);
   color: var(--on-accent);
+  border-color: var(--accent);
   padding: 0.5rem 1.5rem;
   font-size: 0.95rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .btn-submit:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-clear {
-  background: var(--surface);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  border-color: var(--border);
   padding: 0.5rem 1.2rem;
   font-size: 0.95rem;
 }
 
 .btn-clear:hover {
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* ── Cancel button ─────────────────────────────────────────────────────── */
@@ -374,12 +385,13 @@ h2, h3 {
   color: var(--danger);
   font-size: 0.85rem;
   padding: 0.4rem 1rem;
-  border: 1px solid var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
   margin-top: 0.5rem;
 }
 
 .btn-cancel:hover {
   background: var(--danger-subtle);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 /* ── Loading / Spinner ─────────────────────────────────────────────────── */
@@ -481,6 +493,30 @@ h2, h3 {
   background: var(--border);
 }
 
+.result-cover-placeholder {
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-cover-placeholder-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background-color: var(--text-primary);
+  opacity: 0.3;
+  -webkit-mask-image: url('./assets/vinyl-spinner.svg');
+  mask-image: url('./assets/vinyl-spinner.svg');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
 .result-info {
   flex: 1;
   min-width: 0;
@@ -540,69 +576,81 @@ h2, h3 {
 }
 
 .btn {
-  display: inline-block;
-  padding: 0.4rem 0.85rem;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
   font-size: 0.82rem;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   text-decoration: none;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.2s ease, transform 0.15s ease;
 }
 
-/* Primary — amber */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Primary — accent filled with dimension */
 .btn-primary {
   background: var(--accent);
   color: var(--on-accent);
+  border-color: var(--accent);
   padding: 0.65rem 1.5rem;
   font-size: 0.95rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 12px var(--accent-subtle);
+  border-color: var(--accent-hover);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Discogs link — subtle dark */
+/* Discogs link — glass secondary */
 .btn-discogs {
-  background: var(--text-primary);
-  color: var(--bg);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .btn-discogs:hover {
-  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Collection / Accept — amber outline */
+/* Collection / Add — primary action with rim light */
 .btn-collection {
   background: var(--accent);
   color: var(--on-accent);
-  border: 1.5px solid var(--accent);
+  border-color: rgba(129, 140, 248, 0.5);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-collection:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 12px var(--accent-subtle);
+  border-color: rgba(129, 140, 248, 0.7);
+  box-shadow: 0 2px 16px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-/* Secondary — ghost with border */
+/* Tertiary — quiet ghost */
 .btn-show-more {
   align-self: center;
-  background: none;
-  color: var(--text-primary);
-  border: 1px solid var(--border);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-color: var(--border);
 }
 
 .btn-show-more:hover {
-  background: var(--surface);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .batch-instructions {
@@ -707,18 +755,19 @@ h2, h3 {
   align-items: center;
   padding: 0.3rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.82rem;
-  font-weight: 400;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .btn-change-media:hover {
-  background: var(--surface);
-  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.25);
   color: var(--accent-text);
 }
 
@@ -740,6 +789,8 @@ h2, h3 {
 .batch-progress-text {
   color: var(--text-primary);
   margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .batch-progress-failed {
@@ -849,18 +900,17 @@ h2, h3 {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  padding: 0;
-  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
-}
-
-.batch-expanded-results.expanded-visible {
   max-height: 400px;
-  opacity: 1;
   overflow-y: auto;
   padding: 0.5rem 0;
+}
+
+.batch-alt-heading {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+  padding: 0.25rem 0;
 }
 
 /* ── Batch summary ─────────────────────────────────────────────────────── */
@@ -889,27 +939,28 @@ h2, h3 {
 
 .btn-dismiss {
   background: transparent;
-  color: var(--text-primary);
-  border: 1.5px solid var(--text-primary);
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-dismiss:hover {
-  background: rgba(92, 79, 106, 0.08);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── Navigation buttons (secondary style) ──────────────────────────────── */
 
 .btn-nav {
-  background: none;
-  color: var(--text-primary);
-  font-weight: 400;
-  border: 1px solid var(--border);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-color: var(--border);
 }
 
 .btn-nav:hover {
-  background: var(--surface);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* ── Undo / acted state ────────────────────────────────────────────────── */
@@ -934,6 +985,8 @@ h2, h3 {
   font-weight: 400;
   color: var(--text-primary);
   animation: actionPulse 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .result-acted-label-added {
@@ -989,8 +1042,9 @@ h2, h3 {
 /* ── Disabled buttons ──────────────────────────────────────────────────── */
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* ── Discogs Auth (legacy) ─────────────────────────────────────────────── */
@@ -1011,25 +1065,30 @@ h2, h3 {
 .btn-auth-login {
   background: var(--accent);
   color: var(--on-accent);
+  border-color: var(--accent);
   padding: 0.4rem 1rem;
   font-size: 0.82rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .btn-auth-login:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-auth-logout {
-  background: none;
-  color: var(--text-primary);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.78rem;
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--border);
+  border-color: var(--border);
 }
 
 .btn-auth-logout:hover {
-  background: var(--surface);
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .auth-error {
@@ -1129,35 +1188,33 @@ h2, h3 {
 .btn-add-all {
   margin-left: 0.5rem;
   font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
 }
 
 .btn-add-all {
-  background: var(--surface);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  border-color: var(--border);
 }
 
 .btn-add-all:hover {
-  background: var(--border);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* ── Wrong button ──────────────────────────────────────────────────────── */
 
 .btn-wrong {
-  background: var(--danger);
-  color: var(--on-danger);
-  border: 1.5px solid var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 .btn-wrong:hover {
-  filter: brightness(0.9);
-}
-
-.btn-wrong:active,
-.btn-dismiss:active,
-.btn-collection:active {
-  transform: scale(0.96);
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.15);
 }
 
 /* ── Issues view ───────────────────────────────────────────────────────── */
@@ -1173,6 +1230,8 @@ h2, h3 {
   font-size: 1.05rem;
   font-family: inherit;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .issues-list {
@@ -1260,21 +1319,25 @@ h2, h3 {
 .collection-filters-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
-  font-size: 0.82rem;
-  color: var(--text-primary);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.01em;
 }
 
 .filter-label {
-  font-size: 0.82rem;
-  color: var(--text-primary);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 .filter-separator {
-  color: var(--text-primary);
-  opacity: 0.4;
+  color: rgba(255, 255, 255, 0.15);
   user-select: none;
+  margin: 0 0.15rem;
 }
 
 /* LITA-inspired search input */
@@ -1293,7 +1356,7 @@ h2, h3 {
 }
 
 .collection-search::placeholder {
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .collection-search:focus {
@@ -1309,24 +1372,63 @@ h2, h3 {
 }
 
 .collection-sort-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  background: var(--surface);
+  padding: 0.15rem 0.1rem;
+  border: none;
+  border-radius: 0;
+  font-size: 0.8rem;
+  background: transparent;
   color: var(--text-primary);
   font-family: inherit;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s, color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.collection-sort-select:hover {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.collection-sort-select:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 
 .collection-sort-order {
-  padding: 0.45rem 0.6rem;
-  font-size: 0.9rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.collection-sort-order:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .collection-info {
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  padding: 0 0.25rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Disabled state for selects */
+.collection-sort-select:disabled,
+.collection-group-select:disabled,
+.collection-page-size-select:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.collection-sort-order:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 /* ── Collection grouping ─────────────────────────────────────────────── */
@@ -1353,6 +1455,8 @@ h2, h3 {
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .collection-group-count {
@@ -1522,6 +1626,8 @@ h2, h3 {
 .collection-landing .btn-primary {
   padding: 0.85rem 2rem;
   font-size: 1.1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 20px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .sync-progress-bar {
@@ -1540,29 +1646,69 @@ h2, h3 {
 }
 
 .collection-page-size-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  background: var(--surface);
+  padding: 0.15rem 0.1rem;
+  border: none;
+  border-radius: 0;
+  font-size: 0.8rem;
+  background: transparent;
   color: var(--text-primary);
   font-family: inherit;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s, color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.collection-page-size-select:hover {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.collection-page-size-select:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 
 .collection-group-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  background: var(--surface);
+  padding: 0.15rem 0.1rem;
+  border: none;
+  border-radius: 0;
+  font-size: 0.8rem;
+  background: transparent;
   color: var(--text-primary);
   font-family: inherit;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s, color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.collection-group-select:hover {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.collection-group-select:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 
 .collection-resync {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.82rem;
+  padding: 0.15rem 0.1rem;
+  font-size: 0.8rem;
   white-space: nowrap;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.collection-resync:hover {
+  color: var(--text-primary);
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+  background: none;
 }
 
 /* ── Collection selection ──────────────────────────────────────────────── */
@@ -1611,16 +1757,21 @@ h2, h3 {
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .btn-delete-selected {
-  background: var(--danger);
-  color: var(--on-danger);
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.4);
   margin-left: auto;
 }
 
 .btn-delete-selected:hover {
-  opacity: 0.9;
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.15);
 }
 
 .collection-delete-message {
@@ -1671,10 +1822,13 @@ h2, h3 {
 .btn-delete-confirm {
   background: var(--danger);
   color: var(--on-danger);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .btn-delete-confirm:hover {
-  opacity: 0.9;
+  background: #dc2626;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* ── Context menu dialog ───────────────────────────────────────────────── */
@@ -1699,7 +1853,7 @@ h2, h3 {
   box-shadow: var(--shadow-modal);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   animation: scaleIn 0.15s ease;
 }
 
@@ -1751,7 +1905,7 @@ h2, h3 {
 .context-menu-title {
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
   margin: 0 0 0.25rem;
   word-break: break-word;
@@ -1759,7 +1913,7 @@ h2, h3 {
 
 .context-menu-subtitle {
   font-size: 0.875rem;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
   margin: 0 0 1.25rem;
 }
@@ -1820,6 +1974,173 @@ h2, h3 {
   margin: 0.25rem 0;
 }
 
+/* ── Change Cover dialog view ──────────────────────────────────────────── */
+
+.change-cover-view {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+  min-width: 320px;
+  animation: fadeIn 0.2s ease;
+}
+
+.change-cover-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.change-cover-back {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.change-cover-back:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.change-cover-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* ── Option buttons — card-style rows ──────────────────────────────────── */
+
+.change-cover-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.change-cover-option {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+}
+
+.change-cover-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.change-cover-option:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.change-cover-option:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.change-cover-option-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.change-cover-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.change-cover-option-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.change-cover-option-desc {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.01em;
+}
+
+.change-cover-option-reset {
+  margin-top: 0.25rem;
+  border-style: dashed;
+}
+
+.change-cover-option-reset .change-cover-option-icon {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Master cover preview section ──────────────────────────────────────── */
+
+.change-cover-preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  animation: coverReveal 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes coverReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.change-cover-preview {
+  max-width: 260px;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.change-cover-caption {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.change-cover-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.change-cover-confirm-actions .btn {
+  flex: 1;
+}
+
 /* ── Lightbox ──────────────────────────────────────────────────────────── */
 
 .lightbox-overlay {
@@ -1851,7 +2172,7 @@ h2, h3 {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   padding: 1rem;
 }
@@ -1981,14 +2302,14 @@ h2, h3 {
 .btn-google {
   width: 100%;
   padding: 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
+  border-color: var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
   font-size: 0.9rem;
-  font-weight: 400;
+  font-weight: 500;
   cursor: pointer;
   color: var(--text-primary);
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2000,8 +2321,9 @@ h2, h3 {
 }
 
 .btn-google:hover {
-  background: var(--surface);
-  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .login-error {
@@ -2136,6 +2458,8 @@ h2, h3 {
   font-size: 1rem;
   font-family: inherit;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .profile-discogs-status {
@@ -2145,6 +2469,8 @@ h2, h3 {
   gap: 1rem;
   font-size: 0.9rem;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .profile-discogs-hint {
@@ -2155,7 +2481,7 @@ h2, h3 {
 .btn-disconnect {
   background: none;
   color: var(--danger);
-  border: 1px solid var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
   font-size: 0.82rem;
   padding: 0.4rem 0.85rem;
   white-space: nowrap;
@@ -2163,24 +2489,25 @@ h2, h3 {
 
 .btn-disconnect:hover {
   background: var(--danger-subtle);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .btn-sign-out-large {
   width: 100%;
   background: none;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
+  border-color: var(--border);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
   padding: 0.65rem 1rem;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .btn-sign-out-large:hover {
-  background: var(--surface);
+  background: var(--danger-subtle);
   color: var(--danger);
-  border-color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* ── Collection visibility toggle (Profile) ────────────────────────────── */
@@ -2294,15 +2621,20 @@ h2, h3 {
 
 .btn-copy-link {
   background: none;
-  color: var(--accent-text);
-  border: 1px solid var(--accent);
-  padding: 0.45rem 0.75rem;
-  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding: 0.15rem 0.1rem;
+  font-size: 0.8rem;
   white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
 }
 
 .btn-copy-link:hover {
-  background: var(--accent-subtle);
+  background: none;
+  color: var(--text-primary);
+  border-bottom-color: rgba(255, 255, 255, 0.25);
 }
 
 /* ── Skeleton loading for collection grid ────────────────────────────── */
