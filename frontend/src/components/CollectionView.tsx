@@ -57,12 +57,12 @@ function getDisplayCover(item: CollectionItem): string | null {
 }
 
 interface CollectionViewProps {
-  readOnly?: boolean;
-  username?: string;
+  username: string;
 }
 
-export default function CollectionView({ readOnly = false, username }: CollectionViewProps) {
+export default function CollectionView({ username }: CollectionViewProps) {
   const { user } = useAuth();
+  const [isOwner, setIsOwner] = useState(false);
   const [allItems, setAllItems] = useState<CollectionItem[]>([]);
   const [items, setItems] = useState<CollectionItem[]>([]);
   // Store current page's groups for rendering (avoids re-grouping on each render)
@@ -99,7 +99,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [ownerName, setOwnerName] = useState<string | null>(null);
   const [ownerAvatar, setOwnerAvatar] = useState<string | null>(null);
 
-  // Selection state (only used when not readOnly)
+  // Selection state (only used when isOwner)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -134,20 +134,24 @@ export default function CollectionView({ readOnly = false, username }: Collectio
 
   // Check sync status on mount to decide what to show
   useEffect(() => {
-    if (readOnly && username) {
-      // Public view: skip sync check, load directly
+    if (!user) {
+      // Not authenticated: public view, skip sync check
+      setIsOwner(false);
       setInitialCheckDone(true);
       return;
     }
+    // Authenticated: fetch profile to determine ownership
     Promise.all([
       getCollectionSyncStatus().catch(() => ({ status: 'idle' }) as SyncStatus),
       getSettings().catch(() => ({ collection_public: false })),
       getProfile().catch(() => null),
     ]).then(([s, settings, profile]) => {
+      const ownerUsername = profile?.discogs.username ?? null;
+      setDiscogsUsername(ownerUsername);
+      setIsOwner(ownerUsername != null && ownerUsername === username);
       setSyncStatus(s);
       if (s.status === 'syncing') startPolling();
       setCollectionPublic(settings.collection_public);
-      if (profile) setDiscogsUsername(profile.discogs.username ?? null);
     }).catch((err) => {
       console.warn('Initial collection load failed:', err);
     }).finally(() => {
@@ -156,10 +160,10 @@ export default function CollectionView({ readOnly = false, username }: Collectio
 
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, username]);
+  }, [user, username]);
 
-  const hasSynced = readOnly ? true : syncStatus?.completed_at != null;
-  const isSyncing = readOnly ? false : syncStatus?.status === 'syncing';
+  const hasSynced = !isOwner ? true : syncStatus?.completed_at != null;
+  const isSyncing = !isOwner ? false : syncStatus?.status === 'syncing';
 
   // Grouping: sort items into groups by the specified field
   const getGroupKey = useCallback((item: CollectionItem, groupBy: string): string => {
@@ -246,7 +250,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         const fetchPage = groupBy !== 'none' ? 1 : p;
         const fetchPerPage = groupBy !== 'none' ? 250 : ps;
 
-        const data = readOnly && username
+        const data = !isOwner
           ? await getPublicCollection(username, fetchPage, fetchPerPage, s, so, q)
           : await getCollection(fetchPage, fetchPerPage, s, so, q);
 
@@ -279,7 +283,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         setLoading(false);
       }
     },
-    [readOnly, username, groupItems, getPaginatedGroups, calculateTotalPages],
+    [isOwner, username, groupItems, getPaginatedGroups, calculateTotalPages],
   );
 
   // Load collection when ready and when params change
@@ -582,8 +586,8 @@ export default function CollectionView({ readOnly = false, username }: Collectio
     );
   };
 
-  // Landing: never synced and not currently syncing (only for authenticated view)
-  if (!readOnly && !hasSynced && !isSyncing) {
+  // Landing: never synced and not currently syncing (only for owner view)
+  if (isOwner && !hasSynced && !isSyncing) {
     return (
       <div className="collection-view">
         <div className="collection-landing">
@@ -606,8 +610,8 @@ export default function CollectionView({ readOnly = false, username }: Collectio
     );
   }
 
-  // Syncing progress (only for authenticated view)
-  if (!readOnly && isSyncing) {
+  // Syncing progress (only for owner view)
+  if (isOwner && isSyncing) {
     const synced = syncStatus?.items_synced ?? 0;
     const total = syncStatus?.total_items ?? 0;
     return (
@@ -634,7 +638,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   // Collection view (data loaded from MongoDB)
   return (
     <div className="collection-view">
-      {readOnly && ownerName && (
+      {!isOwner && ownerName && (
         <div className="public-collection-header">
           {ownerAvatar && (
             <img src={ownerAvatar} alt="" className="public-collection-avatar" />
@@ -704,7 +708,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
               </option>
             ))}
           </select>
-          {!readOnly && (
+          {isOwner && (
             <>
               <span className="filter-separator">&middot;</span>
               <button
@@ -717,7 +721,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
               </button>
             </>
           )}
-          {!readOnly && collectionPublic && discogsUsername && (
+          {isOwner && collectionPublic && discogsUsername && (
             <>
               <span className="filter-separator">&middot;</span>
               <button
@@ -734,7 +738,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
 
       {error && <p className="error">{error}</p>}
 
-      {!readOnly && selectedIds.size > 0 && (
+      {isOwner && selectedIds.size > 0 && (
         <div className="collection-selection-toolbar">
           <span className="collection-selection-count">
             {selectedIds.size} selected
@@ -796,11 +800,11 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                     {grp.items.map((item, i) => (
                       <div
                         key={`${item.release_id}-${item.instance_id}`}
-                        className={`collection-card${!readOnly && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
+                        className={`collection-card${isOwner && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
                         style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
                         onClick={() => handleCardClick(item)}
                       >
-                        {!readOnly && (
+                        {isOwner && (
                           <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
@@ -846,11 +850,11 @@ export default function CollectionView({ readOnly = false, username }: Collectio
               {items.map((item, i) => (
                 <div
                   key={`${item.release_id}-${item.instance_id}`}
-                  className={`collection-card${!readOnly && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
+                  className={`collection-card${isOwner && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
                   style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
                   onClick={() => handleCardClick(item)}
                 >
-                  {!readOnly && (
+                  {isOwner && (
                     <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -913,7 +917,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         </>
       )}
 
-      {!readOnly && showDeleteModal && (
+      {isOwner && showDeleteModal && (
         <div className="delete-modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
           <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
             <p className="delete-modal-warning">
@@ -974,12 +978,12 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                     <button className="context-menu-item" onClick={handleViewPricing}>
                       View Pricing
                     </button>
-                    {!readOnly && (
+                    {isOwner && (
                       <button className="context-menu-item" onClick={() => setDialogView('changeCover')}>
                         Change Cover
                       </button>
                     )}
-                    {!readOnly && (
+                    {isOwner && (
                       <button
                         className="context-menu-item context-menu-item-danger"
                         onClick={handleDeleteFromCollection}
@@ -1082,7 +1086,7 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       )}
 
       {/* Delete confirmation for single item */}
-      {!readOnly && showDeleteConfirm && contextItem && (
+      {isOwner && showDeleteConfirm && contextItem && (
         <div className="delete-modal-overlay" onClick={() => !deleting && setShowDeleteConfirm(false)}>
           <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
             <p className="delete-modal-warning">

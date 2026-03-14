@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { getAllReviewItems, getCollectionSyncStatus, searchByImage } from './api';
+import { getAllReviewItems, getCollectionSyncStatus, getProfile, searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
@@ -187,18 +187,93 @@ function IdentifyPage() {
   );
 }
 
-function PublicCollectionPage() {
-  const { username } = useParams<{ username: string }>();
-  if (!username) return <p className="error">We need a username to show this collection.</p>;
+function AppNavbar({ user }: { user?: { user_metadata?: { avatar_url?: string } } | null }) {
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+
   return (
-    <div className="app public-collection-page">
-      <nav className="app-navbar">
-        <a href="/" className="navbar-logo">
-          <img src={logoIcon} alt="" className="navbar-icon" />
-          <span className="navbar-wordmark">groove log</span>
-        </a>
-      </nav>
-      <CollectionView readOnly username={username} />
+    <nav className="app-navbar">
+      <NavLink to="/" className="navbar-logo">
+        <img src={logoIcon} alt="" className="navbar-icon" />
+        <span className="navbar-wordmark">groove log</span>
+      </NavLink>
+
+      {user && (
+        <>
+          <div className="navbar-links">
+            <NavLink to="/identify" className="nav-link">
+              Identify
+            </NavLink>
+            <NavLink to="/collection" className="nav-link">
+              Collection
+            </NavLink>
+          </div>
+
+          <div className="navbar-spacer" />
+
+          <div className="navbar-actions">
+            <NavLink to="/profile" className="nav-avatar-btn" title="Profile">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="nav-avatar-img" />
+              ) : (
+                <span className="nav-avatar-fallback">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </span>
+              )}
+            </NavLink>
+          </div>
+        </>
+      )}
+    </nav>
+  );
+}
+
+function CollectionRedirect() {
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    getProfile()
+      .then((profile) => {
+        if (profile.discogs.username) {
+          setTarget(`/collection/${profile.discogs.username}`);
+        } else {
+          setTarget('/profile');
+        }
+      })
+      .catch(() => {
+        setTarget('/profile');
+      });
+  }, []);
+
+  if (!target) {
+    return <div className="loading"><div className="spinner" /></div>;
+  }
+
+  return <Navigate to={target} replace />;
+}
+
+function CollectionPage() {
+  const { username } = useParams<{ username: string }>();
+  const { user, loading } = useAuth();
+
+  if (!username) return <p className="error">We need a username to show this collection.</p>;
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading"><div className="spinner" /></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <AppNavbar user={user} />
+      <div className="route-content">
+        <CollectionView username={username} />
+      </div>
     </div>
   );
 }
@@ -207,13 +282,16 @@ function SmartRedirect() {
   const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    getCollectionSyncStatus()
-      .then((status) => {
-        setTarget(status.completed_at ? '/collection' : '/identify');
-      })
-      .catch(() => {
+    Promise.all([
+      getCollectionSyncStatus().catch(() => null),
+      getProfile().catch(() => null),
+    ]).then(([status, profile]) => {
+      if (status?.completed_at && profile?.discogs.username) {
+        setTarget(`/collection/${profile.discogs.username}`);
+      } else {
         setTarget('/identify');
-      });
+      }
+    });
   }, []);
 
   if (!target) {
@@ -239,48 +317,15 @@ function AppInner() {
     return <LoginPage />;
   }
 
-  const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
-
   return (
     <div className="app">
-      <nav className="app-navbar">
-        <NavLink to="/" className="navbar-logo">
-          <img src={logoIcon} alt="" className="navbar-icon" />
-          <span className="navbar-wordmark">groove log</span>
-        </NavLink>
-
-        <div className="navbar-links">
-          <NavLink to="/identify" className="nav-link">
-            Identify
-          </NavLink>
-          <NavLink to="/collection" className="nav-link">
-            Collection
-          </NavLink>
-        </div>
-
-        <div className="navbar-spacer" />
-
-        <div className="navbar-actions">
-          <NavLink to="/profile" className="nav-avatar-btn" title="Profile">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="nav-avatar-img" />
-            ) : (
-              <span className="nav-avatar-fallback">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-              </span>
-            )}
-          </NavLink>
-        </div>
-      </nav>
+      <AppNavbar user={user} />
 
       <div className="route-content" key={location.pathname.split('/')[1] || 'home'}>
         <Routes>
           <Route path="/" element={<SmartRedirect />} />
           <Route path="/identify/*" element={<IdentifyPage />} />
-          <Route path="/collection" element={<CollectionView />} />
+          <Route path="/collection" element={<CollectionRedirect />} />
           <Route path="/profile" element={<ProfilePage />} />
           {/* Redirects: old routes and login */}
           <Route path="/batch" element={<Navigate to="/identify/batch" replace />} />
@@ -301,7 +346,7 @@ export default function App() {
         <AuthProvider>
           <ToastProvider>
             <Routes>
-              <Route path="/collection/:username" element={<PublicCollectionPage />} />
+              <Route path="/collection/:username" element={<CollectionPage />} />
               <Route path="/*" element={<AppInner />} />
             </Routes>
           </ToastProvider>
