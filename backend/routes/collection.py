@@ -190,7 +190,7 @@ class SetCoverRequest(BaseModel):
 
 def _get_allowed_cover_prefix() -> str:
     """Return the Supabase Storage public URL prefix for the covers bucket."""
-    supabase_url = os.getenv("SUPABASE_URL", os.getenv("VITE_SUPABASE_URL", ""))
+    supabase_url = os.getenv("SUPABASE_URL", os.getenv("VITE_SUPABASE_URL", "http://127.0.0.1:54321"))
     return f"{supabase_url.rstrip('/')}/storage/v1/object/public/covers/"
 
 
