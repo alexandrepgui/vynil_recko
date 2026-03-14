@@ -424,6 +424,10 @@ h2, h3 {
   border-left: 3px solid var(--danger);
 }
 
+.error a {
+  color: var(--accent-text);
+}
+
 /* ── Search info ───────────────────────────────────────────────────────── */
 
 .search-info {

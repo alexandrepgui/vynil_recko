@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { getAllReviewItems, getCollectionSyncStatus, searchByImage } from './api';
 import type { MediaType, SearchResponse } from './types';
@@ -107,7 +107,13 @@ function SingleSearchPage() {
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error">
+          {error.toLowerCase().includes('not connected')
+            ? <>Discogs account not connected. <Link to="/profile">Connect it in your profile</Link>.</>
+            : error}
+        </p>
+      )}
 
       {response && (
         <>

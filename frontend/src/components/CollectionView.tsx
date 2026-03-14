@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, triggerCollectionSync } from '../api';
 import type { CollectionItem, SyncStatus } from '../types';
 import { useToast } from './Toast';
@@ -490,7 +491,13 @@ export default function CollectionView({ readOnly = false, username }: Collectio
           {syncStatus?.status === 'error' && (
             <p className="error">{syncStatus.error || 'Sync didn\'t work. Want to try again?'}</p>
           )}
-          {error && <p className="error">{error}</p>}
+          {error && (
+            <p className="error">
+              {error.toLowerCase().includes('not connected')
+                ? <>Discogs account not connected. <Link to="/profile">Connect it in your profile</Link>.</>
+                : error}
+            </p>
+          )}
         </div>
       </div>
     );
