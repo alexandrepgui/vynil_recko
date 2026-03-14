@@ -89,7 +89,6 @@ h2, h3 {
 .nav-link.active {
   color: var(--accent-text);
   border-bottom-color: var(--accent);
-  box-shadow: 0 2px 8px var(--accent-subtle);
 }
 
 .navbar-spacer {
