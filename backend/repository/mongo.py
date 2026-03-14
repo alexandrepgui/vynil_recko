@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from pymongo import ASCENDING, DESCENDING, MongoClient, ReplaceOne
+from pymongo import ASCENDING, DESCENDING, MongoClient, UpdateOne
 from pymongo.collection import Collection
 
 from config import DEFAULT_USER_SETTINGS
@@ -68,9 +68,17 @@ class MongoRepository:
         if not items:
             return 0
         ops = [
-            ReplaceOne(
+            UpdateOne(
                 {"user_id": item.user_id, "instance_id": item.instance_id},
-                item.to_dict(),
+                {"$set": {
+                    "user_id": item.user_id, "instance_id": item.instance_id,
+                    "release_id": item.release_id, "title": item.title,
+                    "artist": item.artist, "year": item.year,
+                    "genres": item.genres, "styles": item.styles,
+                    "format": item.format, "cover_image": item.cover_image,
+                    "master_id": item.master_id, "date_added": item.date_added,
+                    "synced_at": item.synced_at,
+                }},
                 upsert=True,
             )
             for item in items
@@ -136,6 +144,21 @@ class MongoRepository:
             {"user_id": user_id, "instance_id": {"$in": instance_ids}}
         )
         return result.deleted_count
+
+    def find_collection_item(self, user_id: str, instance_id: int) -> CollectionItem | None:
+        """Find a single collection item by instance_id."""
+        doc = self._collection_items.find_one(
+            {"user_id": user_id, "instance_id": instance_id}, {"_id": 0},
+        )
+        return CollectionItem.from_dict(doc) if doc else None
+
+    def update_collection_item_cover(self, user_id: str, instance_id: int, custom_cover_image: str | None) -> bool:
+        """Set or clear the custom_cover_image on a collection item. Returns True if updated."""
+        result = self._collection_items.update_one(
+            {"user_id": user_id, "instance_id": instance_id},
+            {"$set": {"custom_cover_image": custom_cover_image}},
+        )
+        return result.modified_count > 0
 
     def find_collection_items_by_instance_ids(
         self, user_id: str, instance_ids: list[int],

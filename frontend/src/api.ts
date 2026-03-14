@@ -206,6 +206,45 @@ export async function deleteCollectionItems(
   return resp.json();
 }
 
+export async function previewMasterCover(instanceId: number): Promise<{ cover_url: string }> {
+  const resp = await authFetch(`/api/collection/${instanceId}/cover/master`);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? 'Couldn\'t fetch master cover. Try again?');
+  }
+  return resp.json();
+}
+
+export async function useMasterCover(instanceId: number): Promise<{ custom_cover_image: string }> {
+  const resp = await authFetch(`/api/collection/${instanceId}/cover/master`, { method: 'POST' });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? 'Couldn\'t fetch master cover. Try again?');
+  }
+  return resp.json();
+}
+
+export async function setCustomCover(instanceId: number, url: string): Promise<{ custom_cover_image: string }> {
+  const resp = await authFetch(`/api/collection/${instanceId}/cover`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? 'Couldn\'t set cover. Try again?');
+  }
+  return resp.json();
+}
+
+export async function resetCover(instanceId: number): Promise<void> {
+  const resp = await authFetch(`/api/collection/${instanceId}/cover`, { method: 'DELETE' });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? 'Couldn\'t reset cover. Try again?');
+  }
+}
+
 export async function getCollectionSyncStatus(): Promise<SyncStatus> {
   const resp = await authFetch('/api/collection/sync');
   if (!resp.ok) throw new Error('Couldn\'t check the sync status. Try refreshing?');

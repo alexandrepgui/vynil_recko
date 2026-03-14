@@ -1,11 +1,11 @@
 """Tests for services.collection_sync."""
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from repository.models import CollectionItem
-from services.collection_sync import sync_full_collection, _backfill_master_covers, _transform_release
+from services.collection_sync import sync_full_collection, _transform_release
 from services.discogs_auth import OAuthTokens
 
 
@@ -171,73 +171,30 @@ def test_sync_error_updates_status(mock_get_collection):
     assert "API down" in error_call[0][1]["error"]
 
 
-# ── _backfill_master_covers ─────────────────────────────────────────────────
-
-
-def _make_item(cover_image=None, master_id=None):
-    return CollectionItem(
-        user_id=USER_ID,
-        instance_id=1,
-        release_id=100,
-        title="Test",
-        artist="Artist",
-        year=2020,
-        cover_image=cover_image,
-        master_id=master_id,
-    )
-
-
-@patch("services.collection_sync.get_master_cover")
+@patch("services.collection_sync.get_collection")
 @patch("services.collection_sync.time.sleep")
-def test_backfill_fills_missing_cover(mock_sleep, mock_get_master_cover):
-    mock_get_master_cover.return_value = "https://img.discogs.com/master.jpg"
-    items = [_make_item(cover_image=None, master_id=999)]
-    cache: dict[int, str | None] = {}
+def test_sync_does_not_call_get_master_cover(mock_sleep, mock_get_collection):
+    """Verify sync no longer fetches master covers (removed for on-demand flow)."""
+    mock_get_collection.return_value = _make_page([{
+        "instance_id": 1,
+        "basic_information": {
+            "id": 10,
+            "title": "Test",
+            "artists": [{"name": "Artist"}],
+            "year": 2020,
+            "genres": [],
+            "styles": [],
+            "formats": [{"name": "LP"}],
+            "master_id": 999,
+        },
+    }])
+    repo = MagicMock()
+    repo.delete_stale_items.return_value = 0
 
-    _backfill_master_covers(items, TOKENS, cache)
+    with patch("services.collection_sync.get_collection", mock_get_collection):
+        result = sync_full_collection(repo, USER_ID, TOKENS)
 
-    assert items[0].cover_image == "https://img.discogs.com/master.jpg"
-    assert cache[999] == "https://img.discogs.com/master.jpg"
-    mock_get_master_cover.assert_called_once_with(999, TOKENS)
-
-
-@patch("services.collection_sync.get_master_cover")
-@patch("services.collection_sync.time.sleep")
-def test_backfill_prefers_master_cover_over_existing(mock_sleep, mock_get_master_cover):
-    mock_get_master_cover.return_value = "https://img.discogs.com/master.jpg"
-    items = [_make_item(cover_image="https://existing.jpg", master_id=999)]
-    cache: dict[int, str | None] = {}
-
-    _backfill_master_covers(items, TOKENS, cache)
-
-    assert items[0].cover_image == "https://img.discogs.com/master.jpg"
-    mock_get_master_cover.assert_called_once_with(999, TOKENS)
-
-
-@patch("services.collection_sync.get_master_cover")
-@patch("services.collection_sync.time.sleep")
-def test_backfill_uses_cache(mock_sleep, mock_get_master_cover):
-    items = [
-        _make_item(cover_image=None, master_id=999),
-        _make_item(cover_image=None, master_id=999),
-    ]
-    cache: dict[int, str | None] = {}
-    mock_get_master_cover.return_value = "https://img.discogs.com/cached.jpg"
-
-    _backfill_master_covers(items, TOKENS, cache)
-
-    # Only fetched once despite two items needing the same master
-    mock_get_master_cover.assert_called_once()
-    assert items[0].cover_image == "https://img.discogs.com/cached.jpg"
-    assert items[1].cover_image == "https://img.discogs.com/cached.jpg"
-
-
-@patch("services.collection_sync.get_master_cover")
-@patch("services.collection_sync.time.sleep")
-def test_backfill_skips_items_without_master_id(mock_sleep, mock_get_master_cover):
-    items = [_make_item(cover_image=None, master_id=None)]
-    cache: dict[int, str | None] = {}
-
-    _backfill_master_covers(items, TOKENS, cache)
-
-    mock_get_master_cover.assert_not_called()
+    assert result["synced"] == 1
+    # get_master_cover is no longer imported or called by collection_sync
+    import services.collection_sync as mod
+    assert not hasattr(mod, '_backfill_master_covers')

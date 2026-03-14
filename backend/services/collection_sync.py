@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from logger import get_logger
 from repository.models import CollectionItem
 from repository.mongo import MongoRepository
-from services.discogs import get_collection, get_master_cover
+from services.discogs import get_collection
 from services.discogs_auth import OAuthTokens
 
 log = get_logger("services.collection_sync")
@@ -30,8 +30,6 @@ def sync_full_collection(repo: MongoRepository, user_id: str, tokens: OAuthToken
 
     page = 1
     total_synced = 0
-    # Cache master covers across pages so we only fetch each master once
-    master_cover_cache: dict[int, str | None] = {}
 
     try:
         while True:
@@ -41,9 +39,6 @@ def sync_full_collection(repo: MongoRepository, user_id: str, tokens: OAuthToken
                 break
 
             items = [_transform_release(r, user_id) for r in releases]
-
-            # Backfill missing covers from master releases
-            _backfill_master_covers(items, tokens, master_cover_cache)
 
             repo.upsert_collection_items_bulk(items)
             total_synced += len(items)
@@ -76,39 +71,6 @@ def sync_full_collection(repo: MongoRepository, user_id: str, tokens: OAuthToken
         log.error("Collection sync failed for user_id=%s: %s", user_id, e, exc_info=True)
         repo.update_sync_status(user_id, {"status": "error", "error": str(e)})
         raise
-
-
-def _backfill_master_covers(
-    items: list[CollectionItem],
-    tokens: OAuthTokens,
-    cache: dict[int, str | None],
-) -> None:
-    """Prefer master cover over release cover — master has canonical artwork."""
-    has_master: dict[int, int] = {}  # index → master_id
-    for i, item in enumerate(items):
-        if item.master_id:
-            has_master[i] = item.master_id
-
-    if not has_master:
-        return
-
-    # Fetch unique master covers not already cached
-    unique_masters = set(has_master.values()) - set(cache.keys())
-    for master_id in unique_masters:
-        cache[master_id] = get_master_cover(master_id, tokens)
-        time.sleep(1)  # respect rate limit
-
-    # Apply cached covers
-    filled = 0
-    for i, master_id in has_master.items():
-        cover = cache.get(master_id)
-        if cover:
-            items[i].cover_image = cover
-            filled += 1
-
-    if filled:
-        log.info("Applied %d master covers from %d master release(s)",
-                 filled, len(unique_masters))
 
 
 def _transform_release(r: dict, user_id: str = "") -> CollectionItem:

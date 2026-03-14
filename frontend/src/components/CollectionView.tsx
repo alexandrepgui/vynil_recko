@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, triggerCollectionSync } from '../api';
+import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, previewMasterCover, resetCover, setCustomCover, triggerCollectionSync, useMasterCover } from '../api';
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../AuthContext';
 import type { CollectionItem, SyncStatus } from '../types';
 import { useToast } from './Toast';
 import { createPortal } from 'react-dom';
@@ -50,12 +52,17 @@ const SORT_OPTIONS = [
   { value: 'format', label: 'Format' },
 ];
 
+function getDisplayCover(item: CollectionItem): string | null {
+  return item.custom_cover_image || item.cover_image;
+}
+
 interface CollectionViewProps {
   readOnly?: boolean;
   username?: string;
 }
 
 export default function CollectionView({ readOnly = false, username }: CollectionViewProps) {
+  const { user } = useAuth();
   const [allItems, setAllItems] = useState<CollectionItem[]>([]);
   const [items, setItems] = useState<CollectionItem[]>([]);
   // Store current page's groups for rendering (avoids re-grouping on each render)
@@ -101,6 +108,13 @@ export default function CollectionView({ readOnly = false, username }: Collectio
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextItem, setContextItem] = useState<CollectionItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Dialog view state: detail view or change cover view
+  const [dialogView, setDialogView] = useState<'detail' | 'changeCover'>('detail');
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [masterCoverPreview, setMasterCoverPreview] = useState<string | null>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   // Copy link state (only used in authenticated view)
   const [collectionPublic, setCollectionPublic] = useState(false);
@@ -417,9 +431,20 @@ export default function CollectionView({ readOnly = false, username }: Collectio
     return () => document.removeEventListener('keydown', onKey);
   }, [showContextMenu]);
 
+  // Helper: update a single item's cover in local state
+  const updateItemCover = (instanceId: number, customCover: string | null) => {
+    const patch = (list: CollectionItem[]) =>
+      list.map((it) => it.instance_id === instanceId ? { ...it, custom_cover_image: customCover } : it);
+    setItems(patch);
+    setAllItems(patch);
+    setContextItem((prev) => prev && prev.instance_id === instanceId ? { ...prev, custom_cover_image: customCover } : prev);
+  };
+
   // Context menu handlers
   const handleCardClick = (item: CollectionItem) => {
     setContextItem(item);
+    setDialogView('detail');
+    setMasterCoverPreview(null);
     setShowContextMenu(true);
   };
 
@@ -457,6 +482,84 @@ export default function CollectionView({ readOnly = false, username }: Collectio
       showToast(e instanceof Error ? e.message : 'Delete failed.', 'error');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleFetchMasterCover = async () => {
+    if (!contextItem) return;
+    setCoverLoading(true);
+    try {
+      const { cover_url } = await previewMasterCover(contextItem.instance_id);
+      setMasterCoverPreview(cover_url);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to fetch master cover.', 'error');
+    } finally {
+      setCoverLoading(false);
+    }
+  };
+
+  const handleConfirmMasterCover = async () => {
+    if (!contextItem) return;
+    setCoverLoading(true);
+    try {
+      const { custom_cover_image } = await useMasterCover(contextItem.instance_id);
+      updateItemCover(contextItem.instance_id, custom_cover_image);
+      setMasterCoverPreview(null);
+      showToast('Cover updated');
+      setDialogView('detail');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to set master cover.', 'error');
+    } finally {
+      setCoverLoading(false);
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !contextItem || !user) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('File must be under 5 MB.', 'error');
+      return;
+    }
+
+    setCoverUploading(true);
+    try {
+      const path = `${user.id}/${contextItem.instance_id}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('covers')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('covers')
+        .getPublicUrl(path);
+
+      const coverUrl = `${publicUrl}?t=${Date.now()}`;
+      await setCustomCover(contextItem.instance_id, coverUrl);
+      updateItemCover(contextItem.instance_id, coverUrl);
+      showToast('Cover updated');
+      setDialogView('detail');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Upload failed.', 'error');
+    } finally {
+      setCoverUploading(false);
+      if (coverFileRef.current) coverFileRef.current.value = '';
+    }
+  };
+
+  const handleResetCover = async () => {
+    if (!contextItem) return;
+    setCoverLoading(true);
+    try {
+      await resetCover(contextItem.instance_id);
+      updateItemCover(contextItem.instance_id, null);
+      showToast('Cover reset to default');
+      setDialogView('detail');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to reset cover.', 'error');
+    } finally {
+      setCoverLoading(false);
     }
   };
 
@@ -706,10 +809,10 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                             />
                           </label>
                         )}
-                        {item.cover_image ? (
+                        {getDisplayCover(item) ? (
                           <div className="collection-cover-wrapper">
                             <img
-                              src={item.cover_image}
+                              src={getDisplayCover(item)!}
                               alt={item.title}
                               className="collection-cover"
                               loading="lazy"
@@ -756,10 +859,10 @@ export default function CollectionView({ readOnly = false, username }: Collectio
                       />
                     </label>
                   )}
-                  {item.cover_image ? (
+                  {getDisplayCover(item) ? (
                     <div className="collection-cover-wrapper">
                       <img
-                        src={item.cover_image}
+                        src={getDisplayCover(item)!}
                         alt={item.title}
                         className="collection-cover"
                         loading="lazy"
@@ -838,47 +941,141 @@ export default function CollectionView({ readOnly = false, username }: Collectio
         </div>
       )}
 
-      {/* Record detail dialog — zoomed cover + actions */}
+      {/* Record detail dialog — zoomed cover + actions / change cover */}
       {showContextMenu && contextItem && createPortal(
         <div className="context-menu-overlay" onClick={() => setShowContextMenu(false)}>
           <div className="context-menu context-menu-with-cover" onClick={(e) => e.stopPropagation()}>
-            {contextItem.cover_image && (
-              <img
-                src={contextItem.cover_image}
-                alt={contextItem.title}
-                className="context-menu-cover"
-              />
-            )}
-            <div className="context-menu-body">
-              <h3 className="context-menu-title">{contextItem.title}</h3>
-              <p className="context-menu-subtitle">{contextItem.artist}</p>
-              <div className="context-menu-meta">
-                {contextItem.year > 0 && <span>{contextItem.year}</span>}
-                {contextItem.format && <span>{contextItem.format}</span>}
-                {contextItem.genres.slice(0, 2).map((g) => (
-                  <span key={g}>{g}</span>
-                ))}
-                {contextItem.styles.slice(0, 2).map((s) => (
-                  <span key={s}>{s}</span>
-                ))}
-              </div>
-              <div className="context-menu-actions">
-                <button className="context-menu-item" onClick={handleViewOnDiscogs}>
-                  View on Discogs
-                </button>
-                <button className="context-menu-item" onClick={handleViewPricing}>
-                  View Pricing
-                </button>
-                {!readOnly && (
-                  <button
-                    className="context-menu-item context-menu-item-danger"
-                    onClick={handleDeleteFromCollection}
-                  >
-                    Delete from Collection
+            {dialogView === 'detail' ? (
+              <>
+                {getDisplayCover(contextItem) && (
+                  <img
+                    src={getDisplayCover(contextItem)!}
+                    alt={contextItem.title}
+                    className="context-menu-cover"
+                  />
+                )}
+                <div className="context-menu-body">
+                  <h3 className="context-menu-title">{contextItem.title}</h3>
+                  <p className="context-menu-subtitle">{contextItem.artist}</p>
+                  <div className="context-menu-meta">
+                    {contextItem.year > 0 && <span>{contextItem.year}</span>}
+                    {contextItem.format && <span>{contextItem.format}</span>}
+                    {contextItem.genres.slice(0, 2).map((g) => (
+                      <span key={g}>{g}</span>
+                    ))}
+                    {contextItem.styles.slice(0, 2).map((s) => (
+                      <span key={s}>{s}</span>
+                    ))}
+                  </div>
+                  <div className="context-menu-actions">
+                    <button className="context-menu-item" onClick={handleViewOnDiscogs}>
+                      View on Discogs
+                    </button>
+                    <button className="context-menu-item" onClick={handleViewPricing}>
+                      View Pricing
+                    </button>
+                    {!readOnly && (
+                      <button className="context-menu-item" onClick={() => setDialogView('changeCover')}>
+                        Change Cover
+                      </button>
+                    )}
+                    {!readOnly && (
+                      <button
+                        className="context-menu-item context-menu-item-danger"
+                        onClick={handleDeleteFromCollection}
+                      >
+                        Delete from Collection
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="change-cover-view">
+                <div className="change-cover-header">
+                  <button className="change-cover-back" onClick={() => { setMasterCoverPreview(null); setDialogView('detail'); }} title="Back">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
+                  <h3 className="change-cover-title">Change Cover</h3>
+                </div>
+                {masterCoverPreview ? (
+                  <div className="change-cover-preview-section">
+                    <img
+                      src={masterCoverPreview}
+                      alt={contextItem.title}
+                      className="change-cover-preview"
+                    />
+                    <p className="change-cover-caption">Master release artwork</p>
+                    <div className="change-cover-confirm-actions">
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleConfirmMasterCover}
+                        disabled={coverLoading}
+                      >
+                        {coverLoading ? 'Applying...' : 'Use This Cover'}
+                      </button>
+                      <button
+                        className="btn btn-nav"
+                        onClick={() => setMasterCoverPreview(null)}
+                        disabled={coverLoading}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="change-cover-options">
+                    <button
+                      className="change-cover-option"
+                      onClick={handleFetchMasterCover}
+                      disabled={!contextItem.master_id || coverLoading}
+                      title={contextItem.master_id ? 'Fetch cover from master release' : 'No master release available'}
+                    >
+                      <svg className="change-cover-option-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/><line x1="12" y1="2" x2="12" y2="5" stroke="currentColor" strokeWidth="1" opacity="0.4"/><line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" strokeWidth="1" opacity="0.4"/><line x1="2" y1="12" x2="5" y2="12" stroke="currentColor" strokeWidth="1" opacity="0.4"/><line x1="19" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg>
+                      <div className="change-cover-option-text">
+                        <span className="change-cover-option-label">
+                          {coverLoading ? 'Fetching...' : 'Use Master Cover'}
+                        </span>
+                        <span className="change-cover-option-desc">Canonical artwork from Discogs</span>
+                      </div>
+                    </button>
+                    <button
+                      className="change-cover-option"
+                      onClick={() => coverFileRef.current?.click()}
+                      disabled={coverUploading}
+                    >
+                      <svg className="change-cover-option-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/><path d="M3 16L8.29 11.71a1 1 0 011.42 0L15 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 14l2.29-2.29a1 1 0 011.42 0L21 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                      <div className="change-cover-option-text">
+                        <span className="change-cover-option-label">
+                          {coverUploading ? 'Uploading...' : 'Upload Image'}
+                        </span>
+                        <span className="change-cover-option-desc">JPEG or PNG, up to 5 MB</span>
+                      </div>
+                    </button>
+                    <input
+                      ref={coverFileRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      style={{ display: 'none' }}
+                      onChange={handleCoverUpload}
+                    />
+                    {contextItem.custom_cover_image && (
+                      <button
+                        className="change-cover-option change-cover-option-reset"
+                        onClick={handleResetCover}
+                        disabled={coverLoading}
+                      >
+                        <svg className="change-cover-option-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1115.36-6.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M18 2v5h-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <div className="change-cover-option-text">
+                          <span className="change-cover-option-label">Reset to Default</span>
+                          <span className="change-cover-option-desc">Revert to original release cover</span>
+                        </div>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         </div>,
         document.body,

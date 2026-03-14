@@ -42,7 +42,8 @@
    VITE_SUPABASE_URL=https://<your-project>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-anon-key>
    ```
-6. Test: sign up via login page → verify email → log in → confirm API calls work
+6. Create a `covers` storage bucket (public, same config as `avatars`) — used by the "Change Cover" feature for custom cover image uploads
+7. Test: sign up via login page → verify email → log in → confirm API calls work
 
 **Note:** Local dev already works with `make dev` (uses Supabase CLI). This ticket is for production/cloud setup only.
 

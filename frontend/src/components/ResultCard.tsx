@@ -69,13 +69,17 @@ export default function ResultCard({ result, itemId, renderActions, className, s
 
   return (
     <div className={`result-card ${acted ? 'result-card-acted' : ''} ${status === 'added' ? 'result-card-added' : ''} ${className ?? ''}`} style={style}>
-      {result.cover_image && (
+      {result.cover_image ? (
         <ZoomableImage
           className="result-cover"
           src={result.cover_image}
           alt={result.title ?? 'Cover'}
           loading="lazy"
         />
+      ) : (
+        <div className="result-cover result-cover-placeholder" role="img" aria-label="No cover available">
+          <div className="result-cover-placeholder-icon" aria-hidden="true" />
+        </div>
       )}
 
       <div className="result-info">
