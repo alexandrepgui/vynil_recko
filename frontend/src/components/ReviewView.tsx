@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getAllReviewItems } from '../api';
 import type { BatchItem } from '../types';
 import BatchReview from './BatchReview';
@@ -11,6 +12,7 @@ export default function ReviewView({ onCountChange }: ReviewViewProps) {
   const [items, setItems] = useState<BatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -52,5 +54,10 @@ export default function ReviewView({ onCountChange }: ReviewViewProps) {
     );
   }
 
-  return <BatchReview items={items} onDone={loadItems} />;
+  const focusId = searchParams.get('item');
+  const initialIndex = focusId
+    ? Math.max(0, items.findIndex((i) => i.item_id === focusId))
+    : 0;
+
+  return <BatchReview items={items} onDone={loadItems} initialIndex={initialIndex} />;
 }

@@ -16,7 +16,8 @@ def mock_repo():
     repo = MagicMock()
     repo.saved_records = []
     repo.save_collection_record.side_effect = lambda r: repo.saved_records.append(r)
-    # Default sync status: never synced
+    # Default: no duplicates, never synced
+    repo.has_release.return_value = False
     repo.get_sync_status.return_value = {"status": "idle"}
     repo.load_oauth_tokens.return_value = {
         "access_token": "test-token",
@@ -156,6 +157,25 @@ def test_add_to_collection_success(client, mock_repo):
     assert resp.status_code == 200
     assert resp.json()["instance_id"] == 42
     assert mock_repo.save_collection_record.call_count == 1
+
+
+def test_add_to_collection_duplicate_blocked(client, mock_repo):
+    mock_repo.has_release.return_value = True
+    resp = client.post("/api/collection", json={"release_id": 123})
+    assert resp.status_code == 409
+    assert "already in your collection" in resp.json()["detail"]
+
+
+def test_add_to_collection_duplicate_forced(client, mock_repo):
+    mock_repo.has_release.return_value = True
+    instance = {
+        "instance_id": 99,
+        "resource_url": "https://api.discogs.com/users/testuser/collection/folders/1/releases/123/instances/99",
+    }
+    with patch("routes.search.add_to_collection", return_value=instance):
+        resp = client.post("/api/collection", json={"release_id": 123, "force": True})
+    assert resp.status_code == 200
+    assert resp.json()["instance_id"] == 99
 
 
 def test_add_to_collection_http_404(client, mock_repo):

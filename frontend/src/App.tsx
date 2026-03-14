@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { getAllReviewItems, getCollectionSyncStatus, getProfile, searchByImage } from './api';
-import type { MediaType, SearchResponse } from './types';
+import { getAllReviewItems, getCollection, getCollectionSyncStatus, getProfile, searchByImage } from './api';
+import type { BatchItem, CollectionItem, MediaType, SearchResponse } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
 import { ToastProvider } from './components/Toast';
@@ -15,12 +15,21 @@ import ReviewView from './components/ReviewView';
 import IssuesView from './components/IssuesView';
 import CollectionView from './components/CollectionView';
 import ProfilePage from './components/ProfilePage';
+import LandingPage from './components/LandingPage';
+import SearchDashboard from './components/SearchDashboard';
 import vinylIcon from './assets/vinyl.svg';
 import cdIcon from './assets/cd.svg';
 import { SingleSearchIcon, BatchIcon, ReviewIcon, IssuesIcon } from './components/Icons';
 import logoIcon from './assets/icon.svg';
 
-function SingleSearchPage() {
+interface SingleSearchProps {
+  reviewItems: BatchItem[];
+  issuesCount: number;
+  recentItems: CollectionItem[];
+  collectionTotal: number;
+}
+
+function SingleSearchPage({ reviewItems, issuesCount, recentItems, collectionTotal }: SingleSearchProps) {
   const [mediaType, setMediaType] = useState<MediaType | null>(null);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +85,12 @@ function SingleSearchPage() {
           Upload a photo of your record label to identify it.
         </p>
         <MediaTypeSelector onSelect={setMediaType} />
+        <SearchDashboard
+          reviewItems={reviewItems}
+          issuesCount={issuesCount}
+          recentItems={recentItems}
+          collectionTotal={collectionTotal}
+        />
       </div>
     );
   }
@@ -132,26 +147,39 @@ const subtabClass = ({ isActive }: { isActive: boolean }) =>
 
 function IdentifyPage() {
   const navigate = useNavigate();
-  const [reviewCount, setReviewCount] = useState(0);
+  const [reviewItems, setReviewItems] = useState<BatchItem[]>([]);
   const [issuesCount, setIssuesCount] = useState(0);
+  const [recentItems, setRecentItems] = useState<CollectionItem[]>([]);
+  const [collectionTotal, setCollectionTotal] = useState(0);
 
   const fetchCounts = useCallback(async () => {
     try {
-      const [reviewItems, wrongItems, errorItems] = await Promise.all([
+      const [unreviewed, wrongItems, errorItems] = await Promise.all([
         getAllReviewItems('unreviewed'),
         getAllReviewItems('wrong'),
         getAllReviewItems('unreviewed', 'error'),
       ]);
-      setReviewCount(reviewItems.length);
+      setReviewItems(unreviewed);
       setIssuesCount(wrongItems.length + errorItems.length);
     } catch {
       // Silently ignore count fetch failures
     }
   }, []);
 
+  const fetchRecentCollection = useCallback(async () => {
+    try {
+      const data = await getCollection(1, 6, 'added', 'desc');
+      setRecentItems(data.items);
+      setCollectionTotal(data.total_items);
+    } catch {
+      // Silently ignore — dashboard is supplementary
+    }
+  }, []);
+
   useEffect(() => {
     fetchCounts();
-  }, [fetchCounts]);
+    fetchRecentCollection();
+  }, [fetchCounts, fetchRecentCollection]);
 
   return (
     <div className="identify-page">
@@ -167,7 +195,7 @@ function IdentifyPage() {
         <NavLink to="/identify/review" className={subtabClass}>
           <ReviewIcon className="subtab-icon" aria-hidden="true" />
           Review
-          {reviewCount > 0 && <span className="subtab-badge">{reviewCount}</span>}
+          {reviewItems.length > 0 && <span className="subtab-badge">{reviewItems.length}</span>}
         </NavLink>
         <NavLink to="/identify/issues" className={subtabClass}>
           <IssuesIcon className="subtab-icon" aria-hidden="true" />
@@ -177,7 +205,14 @@ function IdentifyPage() {
       </div>
 
       <Routes>
-        <Route index element={<SingleSearchPage />} />
+        <Route index element={
+          <SingleSearchPage
+            reviewItems={reviewItems}
+            issuesCount={issuesCount}
+            recentItems={recentItems}
+            collectionTotal={collectionTotal}
+          />
+        } />
         <Route path="batch" element={<BatchView onGoToReview={() => navigate('/identify/review')} />} />
         <Route path="review" element={<ReviewView onCountChange={fetchCounts} />} />
         <Route path="issues" element={<IssuesView onCountChange={fetchCounts} />} />
@@ -314,7 +349,12 @@ function AppInner() {
   }
 
   if (!user) {
-    return <LoginPage />;
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<LandingPage />} />
+      </Routes>
+    );
   }
 
   return (
@@ -346,6 +386,7 @@ export default function App() {
         <AuthProvider>
           <ToastProvider>
             <Routes>
+              <Route path="/welcome" element={<LandingPage />} />
               <Route path="/collection/:username" element={<CollectionPage />} />
               <Route path="/*" element={<AppInner />} />
             </Routes>

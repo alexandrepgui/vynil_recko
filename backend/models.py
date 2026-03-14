@@ -57,6 +57,7 @@ class DiscogsResult(BaseModel):
 
 class AddToCollectionRequest(BaseModel):
     release_id: int
+    force: bool = False
 
 
 class SearchResponse(BaseModel):

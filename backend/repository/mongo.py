@@ -129,6 +129,13 @@ class MongoRepository:
             filt["$text"] = {"$search": query}
         return self._collection_items.count_documents(filt)
 
+    def has_release(self, user_id: str, release_id: int) -> bool:
+        """Check if a release already exists in the user's local collection."""
+        return self._collection_items.find_one(
+            {"user_id": user_id, "release_id": release_id},
+            {"_id": 1},
+        ) is not None
+
     def delete_stale_items(self, user_id: str, synced_before: str) -> int:
         """Delete collection items that were not updated during the latest sync."""
         result = self._collection_items.delete_many(

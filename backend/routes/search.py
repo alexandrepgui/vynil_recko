@@ -107,6 +107,9 @@ async def add_to_collection_endpoint(
 
     log.info("Add to collection request: user_id=%s release_id=%d", user.id, body.release_id)
 
+    if not body.force and repo.has_release(user.id, body.release_id):
+        raise HTTPException(status_code=409, detail="This release is already in your collection.")
+
     tokens = require_discogs_tokens(repo, user.id)
 
     try:

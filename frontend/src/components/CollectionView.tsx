@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { deleteCollectionItems, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, previewMasterCover, resetCover, setCustomCover, triggerCollectionSync, useMasterCover } from '../api';
+import { Link, useSearchParams } from 'react-router-dom';
+import { deleteCollectionItems, exportCollection, getCollection, getCollectionSyncStatus, getDiscogsMarketplaceUrl, getDiscogsReleaseUrl, getProfile, getPublicCollection, getSettings, previewMasterCover, resetCover, setCustomCover, triggerCollectionSync, useMasterCover } from '../api';
+import type { ExportFormat } from '../api';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
 import type { CollectionItem, SyncStatus } from '../types';
 import { useToast } from './Toast';
+import CustomSelect from './CustomSelect';
 import { createPortal } from 'react-dom';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 150, 200, 250];
+const DETAILED_PAGE_SIZE_OPTIONS = [25, 50];
 const PAGE_SIZE_KEY = 'groove-log-page-size';
 const GROUP_KEY = 'groove-log-group';
+const VIEW_MODE_KEY = 'groove-log-view-mode';
 
 function loadPageSize(): number {
   try {
@@ -30,6 +34,16 @@ function loadGroup(): string {
     }
   } catch { /* ignore */ }
   return 'none';
+}
+
+type ViewMode = 'grid' | 'detailed';
+
+function loadViewMode(): ViewMode {
+  try {
+    const stored = localStorage.getItem(VIEW_MODE_KEY);
+    if (stored === 'grid' || stored === 'detailed') return stored;
+  } catch { /* ignore */ }
+  return 'grid';
 }
 
 const GROUP_OPTIONS = [
@@ -62,6 +76,7 @@ interface CollectionViewProps {
 
 export default function CollectionView({ username }: CollectionViewProps) {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isOwner, setIsOwner] = useState(false);
   const [allItems, setAllItems] = useState<CollectionItem[]>([]);
   const [items, setItems] = useState<CollectionItem[]>([]);
@@ -70,14 +85,29 @@ export default function CollectionView({ username }: CollectionViewProps) {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [sort, setSort] = useState('artist');
-  const [sortOrder, setSortOrder] = useState('asc');
+  // Initialize sort/sortOrder/group from URL params (fallback to defaults)
+  const [sort, setSort] = useState(() => {
+    const v = searchParams.get('sort');
+    return v && SORT_OPTIONS.some((o) => o.value === v) ? v : 'artist';
+  });
+  const [sortOrder, setSortOrder] = useState(() => {
+    const v = searchParams.get('order');
+    return v === 'desc' ? 'desc' : 'asc';
+  });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [skeletonPhase, setSkeletonPhase] = useState<'hidden' | 'visible' | 'fading'>('hidden');
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(loadPageSize);
-  const [group, setGroup] = useState(loadGroup);
+  const [group, setGroup] = useState(() => {
+    const v = searchParams.get('group');
+    return v && ['artist', 'format', 'none'].includes(v) ? v : loadGroup();
+  });
+
+  // View mode: URL param takes priority, then localStorage, then default
+  const urlView = searchParams.get('view');
+  const initialView = (urlView === 'grid' || urlView === 'detailed') ? urlView : loadViewMode();
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
 
   // Skeleton fade-out: show skeleton while loading, then fade it out
   useEffect(() => {
@@ -115,6 +145,15 @@ export default function CollectionView({ username }: CollectionViewProps) {
   const [coverUploading, setCoverUploading] = useState(false);
   const [masterCoverPreview, setMasterCoverPreview] = useState<string | null>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
+
+  // Export dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const pdfAbortRef = useRef<AbortController | null>(null);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Copy link state (only used in authenticated view)
   const [collectionPublic, setCollectionPublic] = useState(false);
@@ -314,7 +353,7 @@ export default function CollectionView({ username }: CollectionViewProps) {
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
-    }, 300);
+    }, 500);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
@@ -358,25 +397,103 @@ export default function CollectionView({ username }: CollectionViewProps) {
     try { localStorage.setItem(PAGE_SIZE_KEY, String(newSize)); } catch { /* ignore */ }
   };
 
+  // Sync non-default params to URL (keeps URLs clean — only includes overrides)
+  const syncUrlParams = (overrides: { view?: ViewMode; sort?: string; order?: string; group?: string }) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      const v = overrides.view ?? viewMode;
+      const s = overrides.sort ?? sort;
+      const o = overrides.order ?? sortOrder;
+      const g = overrides.group ?? group;
+      if (v === 'grid') { next.delete('view'); } else { next.set('view', v); }
+      if (s === 'artist') { next.delete('sort'); } else { next.set('sort', s); }
+      if (o === 'asc') { next.delete('order'); } else { next.set('order', o); }
+      if (g === 'none') { next.delete('group'); } else { next.set('group', g); }
+      return next;
+    }, { replace: true });
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    setPage(1);
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore */ }
+    syncUrlParams({ view: mode });
+    if (mode === 'detailed' && pageSize > 50) {
+      setPageSize(50);
+    } else if (mode === 'grid') {
+      const saved = loadPageSize();
+      if (saved !== pageSize) setPageSize(saved);
+    }
+  };
+
   const handleSortChange = (newSort: string) => {
     setSort(newSort);
     setPage(1);
+    syncUrlParams({ sort: newSort });
   };
 
   const toggleSortOrder = () => {
-    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
     setPage(1);
+    syncUrlParams({ order: newOrder });
   };
 
   const handleGroupChange = (newGroup: string) => {
-    // Debounce group changes to avoid rapid re-fetches
     if (groupTimerRef.current) clearTimeout(groupTimerRef.current);
     groupTimerRef.current = setTimeout(() => {
       setGroup(newGroup);
       setPage(1);
       try { localStorage.setItem(GROUP_KEY, newGroup); } catch { /* ignore */ }
+      syncUrlParams({ group: newGroup });
     }, 150);
   };
+
+  // Export handler
+  const handleExport = async (format: ExportFormat) => {
+    setShowExportMenu(false);
+    setExporting(true);
+    let signal: AbortSignal | undefined;
+    if (format === 'pdf') {
+      const controller = new AbortController();
+      pdfAbortRef.current = controller;
+      signal = controller.signal;
+      setPdfExporting(true);
+    } else {
+      const label = format === 'xlsx' ? 'Excel' : format.toUpperCase();
+      showToast(`Generating ${label} export...`);
+    }
+    try {
+      await exportCollection(format, sort, sortOrder, debouncedSearch, signal);
+      if (format !== 'pdf') showToast('Export downloaded');
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      showToast(e instanceof Error ? e.message : 'Export failed.', 'error');
+    } finally {
+      setExporting(false);
+      setPdfExporting(false);
+      pdfAbortRef.current = null;
+    }
+  };
+
+  const handleCancelPdf = () => {
+    pdfAbortRef.current?.abort();
+    setPdfExporting(false);
+    setExporting(false);
+    pdfAbortRef.current = null;
+  };
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
 
   // Clear selection when page/search/sort/group changes
   useEffect(() => {
@@ -579,10 +696,90 @@ export default function CollectionView({ username }: CollectionViewProps) {
 
   const handleCopyLink = () => {
     if (!discogsUsername) return;
-    const url = `${window.location.origin}/collection/${discogsUsername}`;
+    const base = `${window.location.origin}/collection/${discogsUsername}`;
+    const params = new URLSearchParams();
+    if (viewMode !== 'grid') params.set('view', viewMode);
+    if (sort !== 'artist') params.set('sort', sort);
+    if (sortOrder !== 'asc') params.set('order', sortOrder);
+    if (group !== 'none') params.set('group', group);
+    const qs = params.toString();
+    const url = qs ? `${base}?${qs}` : base;
     navigator.clipboard.writeText(url).then(
       () => showToast('Link copied'),
       () => showToast("Couldn't copy link", 'error'),
+    );
+  };
+
+  const renderCard = (item: CollectionItem, i: number) => {
+    const selected = isOwner && selectedIds.has(item.instance_id);
+    const delay = { animationDelay: `${Math.min(i * 40, 600)}ms` };
+    const cover = getDisplayCover(item);
+
+    if (viewMode === 'detailed') {
+      return (
+        <div
+          key={`${item.release_id}-${item.instance_id}`}
+          className={`collection-card-detailed${selected ? ' collection-card-selected' : ''}`}
+          style={delay}
+          onClick={() => handleCardClick(item)}
+        >
+          {isOwner && (
+            <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
+              <input type="checkbox" checked={selected} onChange={() => toggleSelect(item.instance_id)} />
+            </label>
+          )}
+          {cover ? (
+            <img src={cover} alt={item.title} className="collection-detail-cover" loading="lazy" />
+          ) : (
+            <div className="collection-detail-cover collection-cover-placeholder" role="img" aria-label="No cover">
+              <div className="collection-cover-placeholder-icon" aria-hidden="true" />
+            </div>
+          )}
+          <div className="collection-detail-info">
+            <div className="collection-detail-title">{item.title}</div>
+            <div className="collection-detail-artist">{item.artist}</div>
+            <div className="collection-detail-meta">
+              {item.year > 0 && <span>{item.year}</span>}
+              {item.format && <span>{item.format}</span>}
+              {item.genres.map((g) => <span key={g}>{g}</span>)}
+              {item.styles.map((s) => <span key={s} className="collection-detail-style">{s}</span>)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={`${item.release_id}-${item.instance_id}`}
+        className={`collection-card${selected ? ' collection-card-selected' : ''}`}
+        style={delay}
+        onClick={() => handleCardClick(item)}
+      >
+        {isOwner && (
+          <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
+            <input type="checkbox" checked={selected} onChange={() => toggleSelect(item.instance_id)} />
+          </label>
+        )}
+        {cover ? (
+          <div className="collection-cover-wrapper">
+            <img src={cover} alt={item.title} className="collection-cover" loading="lazy" />
+          </div>
+        ) : (
+          <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
+            <div className="collection-cover-placeholder-icon" aria-hidden="true" />
+          </div>
+        )}
+        <div className="collection-card-info">
+          <div className="collection-card-title">{item.title}</div>
+          <div className="collection-card-artist">{item.artist}</div>
+          <div className="collection-card-meta">
+            {item.year > 0 && <span>{item.year}</span>}
+            {item.format && <span>{item.format}</span>}
+            {item.genres.slice(0, 2).map((g) => <span key={g}>{g}</span>)}
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -648,90 +845,145 @@ export default function CollectionView({ username }: CollectionViewProps) {
       )}
 
       <div className="collection-controls">
-        <div className="collection-search-row">
-          <input
-            type="text"
-            className="collection-search"
-            placeholder="Search by title or artist..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
         <div className="collection-filters-row">
+          <div className="collection-view-toggle">
+            <button
+              className={`btn collection-view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
+              onClick={() => handleViewModeChange('grid')}
+              title="Grid view"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </button>
+            <button
+              className={`btn collection-view-toggle-btn${viewMode === 'detailed' ? ' active' : ''}`}
+              onClick={() => handleViewModeChange('detailed')}
+              title="Detailed view"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+            </button>
+          </div>
+          <span className="filter-separator">&middot;</span>
           <span className="filter-label">Sort:</span>
           <div className="collection-sort">
-            <select
+            <CustomSelect
               value={sort}
-              onChange={(e) => handleSortChange(e.target.value)}
-              className="collection-sort-select"
-              disabled={group !== 'none'}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={SORT_OPTIONS}
+              onChange={handleSortChange}
+              title="Sort by"
+            />
             <button
               className="btn collection-sort-order"
               onClick={toggleSortOrder}
-              disabled={group !== 'none'}
-              title={group !== 'none' ? 'Sorting disabled when grouped' : 'Toggle sort order'}
+              title="Toggle sort order"
             >
               {sortOrder === 'asc' ? '\u2191' : '\u2193'}
             </button>
           </div>
           <span className="filter-separator">&middot;</span>
           <span className="filter-label">Group:</span>
-          <select
-            className="collection-group-select"
+          <CustomSelect
             value={group}
-            onChange={(e) => handleGroupChange(e.target.value)}
+            options={GROUP_OPTIONS}
+            onChange={handleGroupChange}
             title="Group records by"
-          >
-            {GROUP_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
           <span className="filter-separator">&middot;</span>
-          <select
-            className="collection-page-size-select"
-            value={pageSize}
-            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          <CustomSelect
+            value={String(pageSize)}
+            options={(viewMode === 'detailed' ? DETAILED_PAGE_SIZE_OPTIONS : PAGE_SIZE_OPTIONS).map((n) => ({
+              value: String(n),
+              label: `${n} / page`,
+            }))}
+            onChange={(v) => handlePageSizeChange(Number(v))}
             title="Items per page"
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n} / page
-              </option>
-            ))}
-          </select>
-          {isOwner && (
-            <>
-              <span className="filter-separator">&middot;</span>
+          />
+          <span className="filter-separator">&middot;</span>
+          <div className="collection-search-wrap">
+            <svg className="collection-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="collection-search"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
               <button
-                className="btn collection-resync"
+                className="collection-search-clear"
+                onClick={() => { setSearch(''); searchInputRef.current?.focus(); }}
+                type="button"
+                title="Clear search"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+          {isOwner && (
+            <div className="collection-actions-row">
+              <button
+                className="btn collection-action-btn"
                 onClick={handleSync}
                 disabled={isSyncing}
                 title="Re-sync from Discogs"
               >
-                Re-sync
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                {isSyncing ? 'Syncing...' : 'Sync'}
               </button>
-            </>
-          )}
-          {isOwner && collectionPublic && discogsUsername && (
-            <>
-              <span className="filter-separator">&middot;</span>
-              <button
-                className="btn btn-copy-link"
-                onClick={handleCopyLink}
-                title="Copy public collection link"
-              >
-                Copy link
-              </button>
-            </>
+              {collectionPublic && discogsUsername && (
+                <button
+                  className="btn collection-action-btn"
+                  onClick={handleCopyLink}
+                  title="Share public collection link"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  </svg>
+                  Share
+                </button>
+              )}
+              {totalItems > 0 && (
+                <div className="export-dropdown" ref={exportRef}>
+                  <button
+                    className="btn collection-action-btn"
+                    onClick={() => setShowExportMenu((v) => !v)}
+                    disabled={exporting}
+                    title="Export collection"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    {exporting ? 'Exporting...' : 'Export'}
+                    <svg className="export-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+                  {showExportMenu && (
+                    <div className="export-dropdown-menu">
+                      <button onClick={() => handleExport('csv')}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        CSV
+                      </button>
+                      <button onClick={() => handleExport('xlsx')}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                        Excel (.xlsx)
+                      </button>
+                      <button onClick={() => handleExport('pdf')}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+                        PDF Catalog
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -796,100 +1048,15 @@ export default function CollectionView({ username }: CollectionViewProps) {
                     <h3 className="collection-group-name">{grp.name}</h3>
                     <span className="collection-group-count">{grp.count} record{grp.count !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="collection-grid">
-                    {grp.items.map((item, i) => (
-                      <div
-                        key={`${item.release_id}-${item.instance_id}`}
-                        className={`collection-card${isOwner && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
-                        style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
-                        onClick={() => handleCardClick(item)}
-                      >
-                        {isOwner && (
-                          <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(item.instance_id)}
-                              onChange={() => toggleSelect(item.instance_id)}
-                            />
-                          </label>
-                        )}
-                        {getDisplayCover(item) ? (
-                          <div className="collection-cover-wrapper">
-                            <img
-                              src={getDisplayCover(item)!}
-                              alt={item.title}
-                              className="collection-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ) : (
-                          <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
-                            <div className="collection-cover-placeholder-icon" aria-hidden="true" />
-                          </div>
-                        )}
-                        <div className="collection-card-info">
-                          <div className="collection-card-title">{item.title}</div>
-                          <div className="collection-card-artist">{item.artist}</div>
-                          <div className="collection-card-meta">
-                            {item.year > 0 && <span>{item.year}</span>}
-                            {item.format && <span>{item.format}</span>}
-                            {item.genres.slice(0, 2).map((g) => (
-                              <span key={g}>{g}</span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
+                    {grp.items.map((item, i) => renderCard(item, i))}
                   </div>
                 </div>
               ))}
             </>
           ) : (
-            // Standard grid display
-            <div className="collection-grid">
-              {items.map((item, i) => (
-                <div
-                  key={`${item.release_id}-${item.instance_id}`}
-                  className={`collection-card${isOwner && selectedIds.has(item.instance_id) ? ' collection-card-selected' : ''}`}
-                  style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
-                  onClick={() => handleCardClick(item)}
-                >
-                  {isOwner && (
-                    <label className="collection-card-checkbox" onClickCapture={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.instance_id)}
-                        onChange={() => toggleSelect(item.instance_id)}
-                      />
-                    </label>
-                  )}
-                  {getDisplayCover(item) ? (
-                    <div className="collection-cover-wrapper">
-                      <img
-                        src={getDisplayCover(item)!}
-                        alt={item.title}
-                        className="collection-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : (
-                    <div className="collection-cover collection-cover-placeholder" role="img" aria-label="No cover available">
-                      <div className="collection-cover-placeholder-icon" aria-hidden="true" />
-                    </div>
-                  )}
-                  <div className="collection-card-info">
-                    <div className="collection-card-title">{item.title}</div>
-                    <div className="collection-card-artist">{item.artist}</div>
-                    <div className="collection-card-meta">
-                      {item.year > 0 && <span>{item.year}</span>}
-                      {item.format && <span>{item.format}</span>}
-                      {item.genres.slice(0, 2).map((g) => (
-                        <span key={g}>{g}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
+              {items.map((item, i) => renderCard(item, i))}
             </div>
           )}
 
@@ -915,6 +1082,30 @@ export default function CollectionView({ username }: CollectionViewProps) {
             </div>
           )}
         </>
+      )}
+
+      {pdfExporting && createPortal(
+        <div className="pdf-dialog-overlay">
+          <div className="pdf-dialog">
+            <div className="pdf-vinyl">
+              <div className="pdf-vinyl-disc">
+                <div className="pdf-vinyl-groove pdf-vinyl-groove-1" />
+                <div className="pdf-vinyl-groove pdf-vinyl-groove-2" />
+                <div className="pdf-vinyl-groove pdf-vinyl-groove-3" />
+                <div className="pdf-vinyl-groove pdf-vinyl-groove-4" />
+                <div className="pdf-vinyl-label">
+                  <div className="pdf-vinyl-label-inner" />
+                </div>
+              </div>
+            </div>
+            <p className="pdf-dialog-title">Crafting your catalog<span className="pdf-ellipsis" /></p>
+            <p className="pdf-dialog-hint">
+              Downloading covers &amp; typesetting {totalItems} record{totalItems !== 1 ? 's' : ''}
+            </p>
+            <button className="pdf-dialog-cancel" onClick={handleCancelPdf}>Cancel</button>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {isOwner && showDeleteModal && (

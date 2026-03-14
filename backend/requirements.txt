@@ -10,3 +10,5 @@ pytest
 pytest-cov
 httpx
 pillow
+openpyxl
+weasyprint

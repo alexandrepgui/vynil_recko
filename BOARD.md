@@ -8,6 +8,36 @@
 
 ## Backlog
 
+### T22: Move PDF Generation to Frontend (@react-pdf/renderer)
+
+**Goal:** Offload PDF catalog generation from the backend (WeasyPrint) to the frontend using `@react-pdf/renderer`, eliminating server CPU/memory pressure and the heavy native WeasyPrint dependency.
+
+**Why:**
+- WeasyPrint is CPU/memory intensive on the server (Pango/Cairo native libs, image downloading, HTML rendering)
+- Cover images are already loaded/cached in the browser from the collection grid — no need to re-download on the server
+- Scales better: each user's browser does its own rendering instead of the server handling all exports
+- Removes a heavy native dependency from the backend
+
+**Details:**
+- Replace `backend/services/export.py` PDF path with a frontend-only flow
+- Use `@react-pdf/renderer` (React components → vector PDF, supports custom fonts and page breaks)
+- Rewrite the PDF template in `<Document>`, `<Page>`, `<View>`, `<Text>`, `<Image>` primitives (not CSS — Yoga layout engine)
+- Replicate: title page with stats, format grouping, record cards with cover art, page numbers, custom fonts (Shrikhand, DM Sans, JetBrains Mono)
+- Keep CSV/Excel export on the backend (lightweight, no benefit from moving)
+- Remove WeasyPrint and Pillow from `backend/requirements.txt` once PDF backend path is removed
+- Keep the spinning vinyl loading dialog (already in frontend)
+
+**Files to create/modify:**
+- `frontend/package.json` — add `@react-pdf/renderer`
+- `frontend/src/services/pdfExport.tsx` (create) — PDF document component and generation logic
+- `frontend/src/components/CollectionView.tsx` — call frontend PDF generator instead of backend export API for PDF format
+- `frontend/src/api.ts` — remove PDF from `exportCollection` (keep CSV/XLSX)
+- `backend/services/export.py` — remove `generate_pdf`, `_download_cover_b64`, `_download_all_covers`, and related helpers
+- `backend/routes/export.py` — remove PDF from supported formats
+- `backend/requirements.txt` — remove `weasyprint` (keep `pillow` if used elsewhere)
+
+---
+
 ### T15: Update Navbar - Logo/Brand Left, Profile Picture Right
 
 **Goal:** Move logo and app name to the left side of the navbar. Replace current logo position with user's profile picture. Clicking logo/brand should redirect to home page.
@@ -49,11 +79,102 @@
 
 ---
 
+### T18: Landing Page
+
+**Goal:** Create a landing page at `/` for unauthenticated users. Tells the story of why cataloging matters and how Groove Log makes it effortless. Authenticated users are redirected to the app.
+
+**Details:**
+- Route: `/` for unauthenticated users (existing SmartRedirect handles authenticated users)
+- Animation library: Framer Motion (scroll-triggered reveals, before/after transition)
+- Hero: mix of real vinyl photography and product screenshots, with grain overlay
+- Before/After section: animated transition (old manual flow dissolves into Groove Log flow)
+- Sections: Hero → Problem/Fix → How It Works (3 steps) → Batch Mode → Why Catalog? → Your Data, Your Way (export: CSV, Excel, PDF, Obsidian) → Collection Showcase → CTA Footer
+- Tone: warm, human, slightly irreverent. Never corporate. Lead with pain relief, not tech.
+- Must match existing design system: dark theme, DM Sans / Shrikhand / JetBrains Mono, film grain, indigo accent
+
+**Key messaging:**
+- "Finally catalog your collection." — lead with the tedium of manual Discogs searching
+- "Your exact pressing, not just any version." — speaks to collectors who care about releases
+- Why catalog: gifts (no duplicates), buy/sell/exchange, treat your collection with care
+- "Technology should serve your hobby, not replace it." — analog-first philosophy
+- "Your data, your way." — export to CSV, Excel, PDF, Obsidian vaults
+
+**Files to create/modify:**
+- `frontend/package.json` — add `framer-motion`
+- `frontend/src/components/LandingPage.tsx` (create)
+- `frontend/src/App.tsx` — show LandingPage for unauthenticated users at `/`
+- `frontend/src/App.css` — landing page styles
+
+---
+
+### T19: Remotion Promo Video Generation (Future)
+
+**Goal:** Set up Remotion as a build-time tool for generating promo videos (social media, Product Hunt launch) from React code. Not user-facing — developer/marketing tool only.
+
+**Details:**
+- Separate from the main app bundle (build-time only, not shipped to users)
+- Compositions: hero animation (vinyl spin + app demo), feature showcase, "how it works" sequence
+- Export to MP4/GIF for social media, Product Hunt, README
+- Reuse landing page visual assets and brand tokens
+
+**Files to create:**
+- `remotion/` directory with compositions
+- `remotion/package.json` — Remotion dependencies
+- `remotion/remotion.config.ts`
+
+### T21: Obsidian Vault Export
+
+**Goal:** Add Obsidian vault as an export format for the collection. Generates a .zip file containing markdown files with YAML frontmatter per record, compatible with Obsidian Dataview plugin.
+
+**Details:**
+- New format option `obsidian` in the existing export endpoint (`GET /api/collection/export?format=obsidian`)
+- Each record becomes a markdown file: `collection/{Artist} - {Title}.md`
+- YAML frontmatter: title, artist, year, format, genres, styles, release_id, discogs_url, cover_image, date_added
+- Cover images referenced as URLs (not downloaded into the vault)
+- Uses stdlib `zipfile` — no new dependencies
+- Add "Obsidian Vault" option to the frontend Export dropdown
+
+**Files to modify:**
+- `backend/services/export.py` — add `generate_obsidian_vault()` function
+- `backend/routes/export.py` — add `obsidian` to format pattern, media types, filenames, generators
+- `frontend/src/api.ts` — add `'obsidian'` to `ExportFormat` type
+- `frontend/src/components/CollectionView.tsx` — add menu item to Export dropdown
+- `backend/tests/test_export.py`, `backend/tests/test_export_service.py` — add Obsidian tests
+
+---
+
 ## In Progress
 
 _(empty)_
 
 ## Awaiting Validation
+
+### T20: Collection Export (CSV, Excel, PDF)
+
+**Goal:** Let users export their collection as CSV, Excel (.xlsx), or PDF catalog files.
+
+**Details:**
+- Single endpoint: `GET /api/collection/export?format=csv|xlsx|pdf`
+- Respects current sort/search filters ("export what you see")
+- CSV: UTF-8 with BOM for Excel compatibility
+- Excel: styled headers, auto-width columns, Discogs hyperlinks, frozen header row
+- PDF: title page + table with cover art thumbnails (downloaded in parallel)
+- Export dropdown button in collection toolbar (owner-only)
+
+**Files created:**
+- `backend/services/export.py` — `generate_csv()`, `generate_xlsx()`, `generate_pdf()`
+- `backend/routes/export.py` — export endpoint with format validation
+- `backend/tests/test_export.py` — route integration tests
+- `backend/tests/test_export_service.py` — service unit tests
+
+**Files modified:**
+- `backend/main.py` — registered export router (before collection router to avoid `/api/collection/{username}` conflict)
+- `backend/requirements.txt` — added `openpyxl`, `fpdf2`
+- `frontend/src/api.ts` — added `exportCollection()` function and `ExportFormat` type
+- `frontend/src/components/CollectionView.tsx` — Export dropdown button with CSV/Excel/PDF options
+- `frontend/src/App.css` — export dropdown styles
+
+---
 
 ### T16: Collection Page - Grouping Options
 

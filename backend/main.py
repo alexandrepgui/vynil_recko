@@ -16,6 +16,7 @@ from routes.batch import router as batch_router
 from routes.collection import router as collection_router
 from routes.usage import router as usage_router
 from routes.profile import router as profile_router
+from routes.export import router as export_router
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
 setup_logging()
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(discogs_router)
 app.include_router(search_router)
 app.include_router(batch_router)
+app.include_router(export_router)
 app.include_router(collection_router)
 app.include_router(usage_router)
 app.include_router(profile_router)

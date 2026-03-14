@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -187,6 +188,12 @@ class SetCoverRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2048)
 
 
+def _get_allowed_cover_prefix() -> str:
+    """Return the Supabase Storage public URL prefix for the covers bucket."""
+    supabase_url = os.getenv("SUPABASE_URL", os.getenv("VITE_SUPABASE_URL", "http://127.0.0.1:54321"))
+    return f"{supabase_url.rstrip('/')}/storage/v1/object/public/covers/"
+
+
 @router.put("/api/collection/{instance_id}/cover")
 async def set_custom_cover(
     instance_id: int,
@@ -195,6 +202,15 @@ async def set_custom_cover(
     repo: MongoRepository = Depends(get_repo),
 ):
     """Set a custom cover image URL."""
+    allowed_prefix = _get_allowed_cover_prefix()
+    # Strip cache-bust query params before checking prefix
+    url_without_query = body.url.split("?")[0]
+    if not url_without_query.startswith(allowed_prefix):
+        raise HTTPException(
+            status_code=400,
+            detail="Cover URL must point to Supabase Storage covers bucket.",
+        )
+
     item = repo.find_collection_item(user.id, instance_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")

@@ -1,5 +1,6 @@
 /* ── Theme tokens — dark only ─────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
   --bg:             #1A1816;
   --bg-glass:       rgba(26, 24, 22, 0.85);
   --surface:        #262320;

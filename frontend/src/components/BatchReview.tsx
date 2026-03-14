@@ -7,6 +7,7 @@ import ZoomableImage from './ZoomableImage';
 interface Props {
   items: BatchItem[];
   onDone: () => void;
+  initialIndex?: number;
 }
 
 function DebugPanel({ debug, strategy, labelData }: { debug: DebugInfo; strategy?: string | null; labelData?: LabelData | null }) {
@@ -77,8 +78,8 @@ function DebugPanel({ debug, strategy, labelData }: { debug: DebugInfo; strategy
   );
 }
 
-export default function BatchReview({ items, onDone }: Props) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+export default function BatchReview({ items, onDone, initialIndex = 0 }: Props) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [actionLoading, setActionLoading] = useState(false);
   // Track items acted on in this session: item_id -> action
   const [acted, setActed] = useState<Map<string, 'accepted' | 'skipped' | 'wrong'>>(new Map());

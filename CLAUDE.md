@@ -20,5 +20,8 @@ Flag anything that looks off and ask for permission to fix it:
 
 Don't silently fix these — call them out so the user can make an informed decision.
 
+## Clarifications
+When clarifications are necessary before proceeding, always toggle plan mode. Present your questions and reasoning there, then exit plan mode once alignment is reached and you're ready to implement.
+
 ## Testing
 Run `make full-test` after any backend change. If there are test failures, fix them — even if the failures are unrelated to the current session's work.

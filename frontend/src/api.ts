@@ -33,12 +33,23 @@ export async function searchByImage(file: File, mediaType: MediaType = 'vinyl', 
   return resp.json();
 }
 
-export async function addToCollection(releaseId: number): Promise<void> {
+export class DuplicateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DuplicateError';
+  }
+}
+
+export async function addToCollection(releaseId: number, force = false): Promise<void> {
   const resp = await authFetch('/api/collection', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ release_id: releaseId }),
+    body: JSON.stringify({ release_id: releaseId, force }),
   });
+
+  if (resp.status === 409) {
+    throw new DuplicateError('This release is already in your collection.');
+  }
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => null);
@@ -249,6 +260,41 @@ export async function getCollectionSyncStatus(): Promise<SyncStatus> {
   const resp = await authFetch('/api/collection/sync');
   if (!resp.ok) throw new Error('Couldn\'t check the sync status. Try refreshing?');
   return resp.json();
+}
+
+// ── Export ───────────────────────────────────────────────────────────────
+
+export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
+
+export async function exportCollection(
+  format: ExportFormat,
+  sort: string = 'artist',
+  sortOrder: string = 'asc',
+  search: string = '',
+  signal?: AbortSignal,
+): Promise<void> {
+  const params = new URLSearchParams({ format, sort, sort_order: sortOrder });
+  if (search.trim()) params.set('q', search.trim());
+
+  const resp = await authFetch(`/api/collection/export?${params}`, { signal });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.detail ?? 'Export failed. Try again?');
+  }
+
+  const blob = await resp.blob();
+  const disposition = resp.headers.get('Content-Disposition') ?? '';
+  const filenameMatch = disposition.match(/filename="(.+)"/);
+  const filename = filenameMatch?.[1] ?? `groove-log-collection.${format}`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── Public collection ────────────────────────────────────────────────────
