@@ -8,6 +8,7 @@ import type { CollectionItem, SyncStatus } from '../types';
 import { useToast } from './Toast';
 import CustomSelect from './CustomSelect';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 150, 200, 250];
 const DETAILED_PAGE_SIZE_OPTIONS = [25, 50];
@@ -846,7 +847,8 @@ export default function CollectionView({ username }: CollectionViewProps) {
 
       <div className="collection-controls">
         <div className="collection-filters-row">
-          <div className="collection-view-toggle">
+          <div className="collection-view-toggle" data-mode={viewMode}>
+            <span className="collection-view-toggle-indicator" />
             <button
               className={`btn collection-view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
               onClick={() => handleViewModeChange('grid')}
@@ -1039,26 +1041,36 @@ export default function CollectionView({ username }: CollectionViewProps) {
               <span className="collection-limit-notice"> (showing first 250 items when grouped)</span>
             )}
           </div>
-          {group !== 'none' ? (
-            // Grouped display
-            <>
-              {currentGroups.map((grp) => (
-                <div key={grp.name} className="collection-group">
-                  <div className="collection-group-header">
-                    <h3 className="collection-group-name">{grp.name}</h3>
-                    <span className="collection-group-count">{grp.count} record{grp.count !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
-                    {grp.items.map((item, i) => renderCard(item, i))}
-                  </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={viewMode}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              {group !== 'none' ? (
+                // Grouped display
+                <>
+                  {currentGroups.map((grp) => (
+                    <div key={grp.name} className="collection-group">
+                      <div className="collection-group-header">
+                        <h3 className="collection-group-name">{grp.name}</h3>
+                        <span className="collection-group-count">{grp.count} record{grp.count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
+                        {grp.items.map((item, i) => renderCard(item, i))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
+                  {items.map((item, i) => renderCard(item, i))}
                 </div>
-              ))}
-            </>
-          ) : (
-            <div className={`collection-grid${viewMode === 'detailed' ? ' collection-grid-detailed' : ''}`}>
-              {items.map((item, i) => renderCard(item, i))}
-            </div>
-          )}
+              )}
+            </motion.div>
+          </AnimatePresence>
 
           {pages > 1 && (
             <div className="collection-pagination">
