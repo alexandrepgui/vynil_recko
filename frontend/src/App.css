@@ -1703,6 +1703,25 @@ h2, h3 {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 3px;
+  position: relative;
+}
+
+.collection-view-toggle-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 4px);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-mode="detailed"] .collection-view-toggle-indicator {
+  transform: translateX(calc(100% + 2px));
 }
 
 .collection-view-toggle-btn {
@@ -1712,20 +1731,19 @@ h2, h3 {
   background: transparent;
   color: rgba(255, 255, 255, 0.3);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.2s;
   display: flex;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .collection-view-toggle-btn:hover {
   color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .collection-view-toggle-btn.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* ── Detailed grid layout ─────────────────────────────────────────────── */
